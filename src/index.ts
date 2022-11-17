@@ -38,6 +38,7 @@ import { tokenRegex, monthToStr } from "./utils/formatting";
 
 import "./utils/polyfills";
 import {
+  Day,
   MonthDisplay,
   MonthDropdownOption,
   MonthsDropdown,
@@ -854,62 +855,53 @@ function FlatpickrInstance(
     const firstOfMonth =
       (new Date(year, month, 1).getDay() - self.l10n.firstDayOfWeek + 7) % 7;
 
-    const prevMonthDays = self.utils.getDaysInMonth(
-      (month - 1 + 12) % 12,
-      year
-    );
+    const daysInMonth = self.utils.getDaysInMonth(month, year);
+    const daysInLastWeek =
+      (firstOfMonth + daysInMonth - 1 + self.l10n.firstDayOfWeek) % 7;
+    const daysInNextMonth = (7 - daysInLastWeek) % 7;
+    const daysFromPrevMonth = firstOfMonth;
+    const totalDays = daysFromPrevMonth + daysInMonth + daysInNextMonth;
 
-    const daysInMonth = self.utils.getDaysInMonth(month, year),
-      days = window.document.createDocumentFragment(),
-      isMultiMonth = self.config.showMonths > 1,
-      prevMonthDayClass = isMultiMonth ? "prevMonthDay hidden" : "prevMonthDay",
-      nextMonthDayClass = isMultiMonth ? "nextMonthDay hidden" : "nextMonthDay";
+    const days = window.document.createDocumentFragment();
 
-    let dayNumber = prevMonthDays + 1 - firstOfMonth,
-      dayIndex = 0;
+    const isMultiMonth = self.config.showMonths > 1;
 
-    // prepend days from the ending of previous month
-    for (; dayNumber <= prevMonthDays; dayNumber++, dayIndex++) {
-      days.appendChild(
-        createDay(
-          `flatpickr-day ${prevMonthDayClass}`,
-          new Date(year, month - 1, dayNumber),
-          dayNumber,
-          dayIndex
-        )
-      );
+    for (let i = 0; i < totalDays; i++) {
+      const date = new Date(year, month, -daysFromPrevMonth + 1 + i);
+      const selected = !!isDateSelected(date);
+      const range = rangePosition(date);
+
+      let classNames = "";
+      if (i < daysFromPrevMonth) {
+        classNames = `prevMonthDay ${isMultiMonth && "hidden"}`;
+      } else if (i >= daysFromPrevMonth + daysInMonth) {
+        classNames = `nextMonthDay ${isMultiMonth && "hidden"}`;
+      }
+
+      const day = Day({
+        date,
+        className: `flatpickr-day ${classNames}`,
+        enabled: isEnabled(date, true),
+        selected,
+        range,
+      });
+      triggerEvent("onDayCreate", day);
+
+      days.appendChild(day);
     }
 
-    // Start at 1 since there is no 0th day
-    for (dayNumber = 1; dayNumber <= daysInMonth; dayNumber++, dayIndex++) {
-      days.appendChild(
-        createDay(
-          "flatpickr-day",
-          new Date(year, month, dayNumber),
-          dayNumber,
-          dayIndex
-        )
-      );
-    }
+    if (self.weekNumbers && self.config.showMonths == 1) {
+      const numWeeks = totalDays / 7;
+      const firstDate = new Date(year, month, -daysFromPrevMonth + 1);
+      const firstWeekNumber = self.config.getWeek(firstDate);
 
-    // append days from the next month
-    for (
-      let dayNum = daysInMonth + 1;
-      dayNum <= 42 - firstOfMonth &&
-      (self.config.showMonths === 1 || dayIndex % 7 !== 0);
-      dayNum++, dayIndex++
-    ) {
-      days.appendChild(
-        createDay(
-          `flatpickr-day ${nextMonthDayClass}`,
-          new Date(year, month + 1, dayNum % daysInMonth),
-          dayNum,
-          dayIndex
-        )
-      );
+      for (let i = 0; i < numWeeks; i++) {
+        self.weekNumbers.insertAdjacentHTML(
+          "beforeend",
+          `<span class='flatpickr-day'>${firstWeekNumber + i}</span>`
+        );
+      }
     }
-
-    //updateNavigationCurrentMonth();
 
     const dayContainer = createElement<HTMLDivElement>("div", "dayContainer");
     dayContainer.appendChild(days);
@@ -2707,6 +2699,19 @@ function FlatpickrInstance(
       compareDates(date, self.selectedDates[0]) >= 0 &&
       compareDates(date, self.selectedDates[1]) <= 0
     );
+  }
+
+  function rangePosition(date: Date): "start" | "end" | "middle" | undefined {
+    if (!isDateInRange(date)) {
+      return;
+    }
+    if (compareDates(date, self.selectedDates[0]) === 0) {
+      return "start";
+    }
+    if (compareDates(date, self.selectedDates[1]) === 0) {
+      return "end";
+    }
+    return "middle";
   }
 
   function updateNavigationCurrentMonth() {

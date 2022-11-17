@@ -1,6 +1,8 @@
 import { createElement, createNumberInput, getEventTarget } from "./utils/dom";
 import { monthToStr } from "./utils/formatting";
 import { Locale } from "./types/locale";
+import { getDaysInMonth } from "./utils/dates";
+import { DayElement } from "./types/instance";
 
 type Events = {
   [k: string]: (e?: any) => void;
@@ -131,4 +133,63 @@ export const YearInput = (
   )[0] as HTMLInputElement;
 
   return [wrapper, yearElement];
+};
+
+type DayProps = EventsProp & {
+  date: Date;
+  className: string;
+  enabled: boolean;
+  selected: boolean;
+  current?: boolean;
+  hidden?: boolean;
+  range?: "start" | "end" | "middle";
+};
+export const Day = (props: DayProps): DayElement => {
+  const { date, className, enabled, selected, current, hidden, range } = props;
+
+  const dayElement = createElement<DayElement>(
+    "span",
+    className,
+    date.getDate().toString()
+  );
+
+  dayElement.dateObj = date;
+  // dayElement.setAttribute(
+  //   "aria-label",
+  // TODO
+  //   self.formatDate(date, self.config.ariaDateFormat)
+  // );
+
+  if (hidden) {
+    dayElement.classList.add("hidden");
+  }
+
+  if (current) {
+    dayElement.classList.add("today");
+    dayElement.setAttribute("aria-current", "date");
+  }
+
+  if (selected) {
+    dayElement.classList.add("selected");
+  }
+
+  if (!enabled) {
+    dayElement.classList.add("flatpickr-disabled");
+  }
+
+  switch (range) {
+    case "start":
+      dayElement.classList.add("startRange");
+      break;
+
+    case "end":
+      dayElement.classList.add("endRange");
+      break;
+
+    case "middle":
+      dayElement.classList.add("inRange");
+      break;
+  }
+
+  return dayElement;
 };

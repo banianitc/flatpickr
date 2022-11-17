@@ -206,3 +206,10 @@ export function getDefaultHours(config: ParsedOptions) {
 
   return { hours, minutes, seconds };
 }
+
+export const getDaysInMonth = (month: number, year: number, l10n: Locale) => {
+  if (month === 1 && ((year % 4 === 0 && year % 100 !== 0) || year % 400 === 0))
+    return 29;
+
+  return l10n.daysInMonth[month];
+};
