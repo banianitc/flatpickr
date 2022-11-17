@@ -37,6 +37,12 @@ import {
 import { tokenRegex, monthToStr } from "./utils/formatting";
 
 import "./utils/polyfills";
+import {
+  MonthDisplay,
+  MonthDropdownOption,
+  MonthsDropdown,
+  YearInput,
+} from "./calendar";
 
 const DEBOUNCED_CHANGE_MS = 300;
 
@@ -525,7 +531,7 @@ function FlatpickrInstance(
 
     if (triggerChange && self.currentYear !== oldYear) {
       triggerEvent("onYearChange");
-      buildMonthSwitch();
+      buildMonths();
     }
 
     if (
@@ -938,57 +944,6 @@ function FlatpickrInstance(
     }
   }
 
-  function buildMonthSwitch() {
-    if (
-      self.config.showMonths > 1 ||
-      self.config.monthSelectorType !== "dropdown"
-    )
-      return;
-
-    const shouldBuildMonth = function (month: number): boolean {
-      if (
-        self.config.minDate !== undefined &&
-        self.currentYear === self.config.minDate.getFullYear() &&
-        month < self.config.minDate.getMonth()
-      ) {
-        return false;
-      }
-
-      return !(
-        self.config.maxDate !== undefined &&
-        self.currentYear === self.config.maxDate.getFullYear() &&
-        month > self.config.maxDate.getMonth()
-      );
-    };
-
-    self.monthsDropdownContainer.tabIndex = -1;
-
-    self.monthsDropdownContainer.innerHTML = "";
-
-    for (let i = 0; i < 12; i++) {
-      if (!shouldBuildMonth(i)) continue;
-
-      const month = createElement<HTMLOptionElement>(
-        "option",
-        "flatpickr-monthDropdown-month"
-      );
-
-      month.value = new Date(self.currentYear, i).getMonth().toString();
-      month.textContent = monthToStr(
-        i,
-        self.config.shorthandCurrentMonth,
-        self.l10n
-      );
-      month.tabIndex = -1;
-
-      if (self.currentMonth === i) {
-        month.selected = true;
-      }
-
-      self.monthsDropdownContainer.appendChild(month);
-    }
-  }
-
   function buildMonth() {
     const container = createElement("div", "flatpickr-month");
     const monthNavFragment = window.document.createDocumentFragment();
@@ -999,56 +954,37 @@ function FlatpickrInstance(
       self.config.showMonths > 1 ||
       self.config.monthSelectorType === "static"
     ) {
-      monthElement = createElement<HTMLSpanElement>("span", "cur-month");
-    } else {
-      self.monthsDropdownContainer = createElement<HTMLSelectElement>(
-        "select",
-        "flatpickr-monthDropdown-months"
-      );
-
-      self.monthsDropdownContainer.setAttribute(
-        "aria-label",
-        self.l10n.monthAriaLabel
-      );
-
-      bind(self.monthsDropdownContainer, "change", (e: Event) => {
-        const target = getEventTarget(e) as HTMLSelectElement;
-        const selectedMonth = parseInt(target.value, 10);
-
-        self.changeMonth(selectedMonth - self.currentMonth);
-
-        triggerEvent("onMonthChange");
+      monthElement = MonthDisplay({
+        month: self.currentMonth,
+        short: self.config.shorthandCurrentMonth,
+        l10n: self.l10n,
       });
+    } else {
+      monthElement = MonthsDropdown({
+        year: self.currentYear,
+        l10n: self.l10n,
+        minDate: self.config.minDate,
+        maxDate: self.config.maxDate,
+        short: self.config.shorthandCurrentMonth,
+        selectedMonth: self.currentMonth,
+        events: {
+          change: (value: string) => {
+            const selectedMonth = parseInt(value, 10);
 
-      buildMonthSwitch();
+            self.changeMonth(selectedMonth - self.currentMonth);
 
-      monthElement = self.monthsDropdownContainer;
+            triggerEvent("onMonthChange");
+          },
+        },
+      });
     }
 
-    const yearInput = createNumberInput("cur-year", { tabindex: "-1" });
-
-    const yearElement = yearInput.getElementsByTagName(
-      "input"
-    )[0] as HTMLInputElement;
-    yearElement.setAttribute("aria-label", self.l10n.yearAriaLabel);
-
-    if (self.config.minDate) {
-      yearElement.setAttribute(
-        "min",
-        self.config.minDate.getFullYear().toString()
-      );
-    }
-
-    if (self.config.maxDate) {
-      yearElement.setAttribute(
-        "max",
-        self.config.maxDate.getFullYear().toString()
-      );
-
-      yearElement.disabled =
-        !!self.config.minDate &&
-        self.config.minDate.getFullYear() === self.config.maxDate.getFullYear();
-    }
+    const [yearInput, yearElement] = YearInput({
+      l10n: self.l10n,
+      minDate: self.config.minDate,
+      maxDate: self.config.maxDate,
+      value: self.currentYear.toString(),
+    });
 
     const currentMonth = createElement<HTMLDivElement>(
       "div",
@@ -1321,7 +1257,7 @@ function FlatpickrInstance(
       self.currentMonth = (self.currentMonth + 12) % 12;
 
       triggerEvent("onYearChange");
-      buildMonthSwitch();
+      buildMonths();
     }
 
     buildDays();
@@ -1543,7 +1479,7 @@ function FlatpickrInstance(
     if (isNewYear) {
       self.redraw();
       triggerEvent("onYearChange");
-      buildMonthSwitch();
+      buildMonths();
     }
   }
 
@@ -2297,7 +2233,7 @@ function FlatpickrInstance(
   function redraw() {
     if (self.config.noCalendar || self.isMobile) return;
 
-    buildMonthSwitch();
+    buildMonths();
     updateNavigationCurrentMonth();
     buildDays();
   }
@@ -2371,7 +2307,7 @@ function FlatpickrInstance(
 
       if (isNewYear) {
         triggerEvent("onYearChange");
-        buildMonthSwitch();
+        buildMonths();
       }
 
       triggerEvent("onMonthChange");
@@ -2791,7 +2727,8 @@ function FlatpickrInstance(
             self.l10n
           ) + " ";
       } else {
-        self.monthsDropdownContainer.value = d.getMonth().toString();
+        // self.monthsDropdownContainer.value = d.getMonth().toString();
+        buildMonths();
       }
 
       yearElement.value = d.getFullYear().toString();
