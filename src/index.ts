@@ -39,6 +39,7 @@ import { tokenRegex, monthToStr } from "./utils/formatting";
 import "./utils/polyfills";
 import {
   Day,
+  MonthDays,
   MonthDisplay,
   MonthDropdownOption,
   MonthsDropdown,
@@ -74,7 +75,6 @@ function FlatpickrInstance(
   self.onMouseOver = onMouseOver;
 
   self._createElement = createElement;
-  self.createDay = createDay;
   self.destroy = destroy;
   self.isEnabled = isEnabled;
   self.jumpToDate = jumpToDate;
@@ -683,85 +683,6 @@ function FlatpickrInstance(
       ).appendChild(self.calendarContainer);
   }
 
-  function createDay(
-    className: string,
-    date: Date,
-    _dayNumber: number,
-    i: number
-  ) {
-    const dateIsEnabled = isEnabled(date, true),
-      dayElement = createElement<DayElement>(
-        "span",
-        className,
-        date.getDate().toString()
-      );
-
-    dayElement.dateObj = date;
-    dayElement.$i = i;
-    dayElement.setAttribute(
-      "aria-label",
-      self.formatDate(date, self.config.ariaDateFormat)
-    );
-
-    if (
-      className.indexOf("hidden") === -1 &&
-      compareDates(date, self.now) === 0
-    ) {
-      self.todayDateElem = dayElement;
-      dayElement.classList.add("today");
-      dayElement.setAttribute("aria-current", "date");
-    }
-
-    if (dateIsEnabled) {
-      dayElement.tabIndex = -1;
-      if (isDateSelected(date)) {
-        dayElement.classList.add("selected");
-        self.selectedDateElem = dayElement;
-
-        if (self.config.mode === "range") {
-          toggleClass(
-            dayElement,
-            "startRange",
-            self.selectedDates[0] &&
-              compareDates(date, self.selectedDates[0], true) === 0
-          );
-
-          toggleClass(
-            dayElement,
-            "endRange",
-            self.selectedDates[1] &&
-              compareDates(date, self.selectedDates[1], true) === 0
-          );
-
-          if (className === "nextMonthDay") dayElement.classList.add("inRange");
-        }
-      }
-    } else {
-      dayElement.classList.add("flatpickr-disabled");
-    }
-
-    if (self.config.mode === "range") {
-      if (isDateInRange(date) && !isDateSelected(date))
-        dayElement.classList.add("inRange");
-    }
-
-    if (
-      self.weekNumbers &&
-      self.config.showMonths === 1 &&
-      className !== "prevMonthDay" &&
-      i % 7 === 6
-    ) {
-      self.weekNumbers.insertAdjacentHTML(
-        "beforeend",
-        "<span class='flatpickr-day'>" + self.config.getWeek(date) + "</span>"
-      );
-    }
-
-    triggerEvent("onDayCreate", dayElement);
-
-    return dayElement;
-  }
-
   function focusOnDayElem(targetNode: DayElement) {
     targetNode.focus();
     if (self.config.mode === "range") onMouseOver(targetNode);
@@ -851,63 +772,25 @@ function FlatpickrInstance(
     }
   }
 
-  function buildMonthDays(year: number, month: number) {
+  const getCalendarMonthDates = (
+    year: number,
+    month: number
+  ): {
+    preceedingDays: number;
+    followingDays: number;
+    year: number;
+    month: number;
+  } => {
     const firstOfMonth =
       (new Date(year, month, 1).getDay() - self.l10n.firstDayOfWeek + 7) % 7;
 
     const daysInMonth = self.utils.getDaysInMonth(month, year);
     const daysInLastWeek =
       (firstOfMonth + daysInMonth - 1 + self.l10n.firstDayOfWeek) % 7;
-    const daysInNextMonth = (7 - daysInLastWeek) % 7;
-    const daysFromPrevMonth = firstOfMonth;
-    const totalDays = daysFromPrevMonth + daysInMonth + daysInNextMonth;
+    const followingDays = (7 - daysInLastWeek) % 7;
 
-    const days = window.document.createDocumentFragment();
-
-    const isMultiMonth = self.config.showMonths > 1;
-
-    for (let i = 0; i < totalDays; i++) {
-      const date = new Date(year, month, -daysFromPrevMonth + 1 + i);
-      const selected = !!isDateSelected(date);
-      const range = rangePosition(date);
-
-      let classNames = "";
-      if (i < daysFromPrevMonth) {
-        classNames = `prevMonthDay ${isMultiMonth && "hidden"}`;
-      } else if (i >= daysFromPrevMonth + daysInMonth) {
-        classNames = `nextMonthDay ${isMultiMonth && "hidden"}`;
-      }
-
-      const day = Day({
-        date,
-        className: `flatpickr-day ${classNames}`,
-        enabled: isEnabled(date, true),
-        selected,
-        range,
-      });
-      triggerEvent("onDayCreate", day);
-
-      days.appendChild(day);
-    }
-
-    if (self.weekNumbers && self.config.showMonths == 1) {
-      const numWeeks = totalDays / 7;
-      const firstDate = new Date(year, month, -daysFromPrevMonth + 1);
-      const firstWeekNumber = self.config.getWeek(firstDate);
-
-      for (let i = 0; i < numWeeks; i++) {
-        self.weekNumbers.insertAdjacentHTML(
-          "beforeend",
-          `<span class='flatpickr-day'>${firstWeekNumber + i}</span>`
-        );
-      }
-    }
-
-    const dayContainer = createElement<HTMLDivElement>("div", "dayContainer");
-    dayContainer.appendChild(days);
-
-    return dayContainer;
-  }
+    return { preceedingDays: firstOfMonth, followingDays, year, month };
+  };
 
   function buildDays() {
     if (self.daysContainer === undefined) {
@@ -925,7 +808,18 @@ function FlatpickrInstance(
       const d = new Date(self.currentYear, self.currentMonth, 1);
       d.setMonth(self.currentMonth + i);
 
-      frag.appendChild(buildMonthDays(d.getFullYear(), d.getMonth()));
+      const monthDays = MonthDays({
+        ...getCalendarMonthDates(d.getFullYear(), d.getMonth()),
+        isSelected: (d: Date): boolean => !!isDateSelected(d),
+        rangePosition,
+        isEnabled,
+        l10n: self.l10n,
+        events: {
+          onDayCreate: (day) => triggerEvent("onDayCreate", day),
+        },
+      });
+
+      frag.appendChild(monthDays);
     }
 
     self.daysContainer.appendChild(frag);

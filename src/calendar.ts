@@ -135,6 +135,8 @@ export const YearInput = (
   return [wrapper, yearElement];
 };
 
+type RangePosition = "start" | "end" | "middle" | undefined;
+
 type DayProps = EventsProp & {
   date: Date;
   className: string;
@@ -142,7 +144,7 @@ type DayProps = EventsProp & {
   selected: boolean;
   current?: boolean;
   hidden?: boolean;
-  range?: "start" | "end" | "middle";
+  range?: RangePosition;
 };
 export const Day = (props: DayProps): DayElement => {
   const { date, className, enabled, selected, current, hidden, range } = props;
@@ -192,4 +194,67 @@ export const Day = (props: DayProps): DayElement => {
   }
 
   return dayElement;
+};
+
+type MonthDaysProps = EventsProp & {
+  year: number;
+  month: number;
+  preceedingDays: number;
+  followingDays: number;
+  l10n: Locale;
+  hidePreceeding?: boolean;
+  hideFollowing?: boolean;
+  isSelected: (date: Date) => boolean;
+  rangePosition: (date: Date) => RangePosition;
+  isEnabled: (date: Date, timeless: boolean) => boolean;
+};
+export const MonthDays = (props: MonthDaysProps): HTMLDivElement => {
+  const {
+    year,
+    month,
+    preceedingDays,
+    followingDays,
+    hidePreceeding,
+    hideFollowing,
+    l10n,
+    isSelected,
+    rangePosition,
+    isEnabled,
+  } = props;
+  const days = window.document.createDocumentFragment();
+
+  const daysInMonth = getDaysInMonth(month, year, l10n);
+  const totalDays = preceedingDays + daysInMonth + followingDays;
+
+  for (let i = 0; i < totalDays; i++) {
+    const date = new Date(year, month, -preceedingDays + 1 + i);
+    const selected = isSelected(date);
+    const range = rangePosition(date);
+
+    let classNames = "";
+    if (i < preceedingDays) {
+      classNames = `prevMonthDay ${hidePreceeding && "hidden"}`;
+    } else if (i >= preceedingDays + daysInMonth) {
+      classNames = `nextMonthDay ${hideFollowing && "hidden"}`;
+    }
+
+    const day = Day({
+      date,
+      className: `flatpickr-day ${classNames}`,
+      enabled: isEnabled(date, true),
+      selected,
+      range,
+    });
+
+    if (props?.events?.onDayCreate) {
+      props.events.onDayCreate(day);
+    }
+
+    days.appendChild(day);
+  }
+
+  const dayContainer = createElement<HTMLDivElement>("div", "dayContainer");
+  dayContainer.appendChild(days);
+
+  return dayContainer;
 };
