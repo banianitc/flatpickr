@@ -312,7 +312,7 @@ export interface ParsedOptions {
   minTime?: Date;
   minuteIncrement: number;
   mode: BaseOptions["mode"];
-  monthSelectorType: string;
+  monthSelectorType: "static" | "dropdown";
   nextArrow: string;
   noCalendar: boolean;
   now: Date;

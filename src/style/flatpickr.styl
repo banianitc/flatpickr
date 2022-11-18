@@ -159,8 +159,13 @@
   position relative
   display inline-block
 
+.flatpickr-calendar-month
+  display inline-block
+
 .flatpickr-months
   display flex
+  justify-content space-between
+  align-items center
 
   .flatpickr-month
     if $noCalendarBorder is defined
@@ -180,13 +185,13 @@
     user-select none
     text-decoration none
     cursor pointer
-    position absolute
-    top 0
     height $monthNavHeight
     padding 10px
     z-index 3
     color $monthForeground
     fill $monthForeground
+    display flex
+    align-items center
 
     &.flatpickr-disabled
       display none
@@ -198,7 +203,6 @@
       /*!
       /*rtl:begin:ignore*//*
       */
-      left 0
       /*!
       /*rtl:end:ignore*//*
       */
@@ -208,7 +212,6 @@
       /*!
       /*rtl:begin:ignore*//*
       */
-      right 0
       /*!
       /*rtl:end:ignore*//*
       */
@@ -307,13 +310,14 @@
   line-height inherit
   font-weight 300
   color inherit
-  position absolute
-  width 75%
   left 12.5%
   padding (0.22*$monthNavHeight) 0 0 0
   line-height 1
   height $monthNavHeight
-  display inline-block
+  display inline-flex
+  flex-direction row
+  justify-content center
+  align-items center
   text-align center
   transform translate3d(0px, 0px, 0px)
 

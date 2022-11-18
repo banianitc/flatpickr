@@ -22,6 +22,8 @@ import {
   findParent,
   toggleClass,
   getEventTarget,
+  createEvent,
+  incrementNumInput,
 } from "./utils/dom";
 import {
   compareDates,
@@ -32,19 +34,14 @@ import {
   getDefaultHours,
   calculateSecondsSinceMidnight,
   parseSeconds,
+  getDaysInMonth,
 } from "./utils/dates";
 
 import { tokenRegex, monthToStr } from "./utils/formatting";
 
 import "./utils/polyfills";
-import {
-  Day,
-  MonthDays,
-  MonthDisplay,
-  MonthDropdownOption,
-  MonthsDropdown,
-  YearInput,
-} from "./calendar";
+import { Calendar, CalendarMonth } from "./calendar";
+import { Croatian } from "./l10n/hr";
 
 const DEBOUNCED_CHANGE_MS = 300;
 
@@ -150,33 +147,29 @@ function FlatpickrInstance(
   }
 
   function setCalendarWidth() {
-    const config = self.config;
-
-    if (config.weekNumbers === false && config.showMonths === 1) {
-      return;
-    } else if (config.noCalendar !== true) {
-      window.requestAnimationFrame(function () {
-        if (self.calendarContainer !== undefined) {
-          self.calendarContainer.style.visibility = "hidden";
-          self.calendarContainer.style.display = "block";
-        }
-        if (self.daysContainer !== undefined) {
-          const daysWidth = (self.days.offsetWidth + 1) * config.showMonths;
-
-          self.daysContainer.style.width = daysWidth + "px";
-
-          self.calendarContainer.style.width =
-            daysWidth +
-            (self.weekWrapper !== undefined
-              ? self.weekWrapper.offsetWidth
-              : 0) +
-            "px";
-
-          self.calendarContainer.style.removeProperty("visibility");
-          self.calendarContainer.style.removeProperty("display");
-        }
-      });
-    }
+    // const config = self.config;
+    // if (config.weekNumbers === false && config.showMonths === 1) {
+    //   return;
+    // } else if (config.noCalendar !== true) {
+    //   window.requestAnimationFrame(function () {
+    //     // if (self.calendarContainer !== undefined) {
+    //     //   self.calendarContainer.style.visibility = "hidden";
+    //     //   self.calendarContainer.style.display = "block";
+    //     // }
+    //     if (self.daysContainer !== undefined) {
+    //       const daysWidth = (self.days.offsetWidth + 1) * config.showMonths;
+    //       self.daysContainer.style.width = daysWidth + "px";
+    //       self.calendarContainer.style.width =
+    //         daysWidth +
+    //         (self.weekWrapper !== undefined
+    //           ? self.weekWrapper.offsetWidth
+    //           : 0) +
+    //         "px";
+    //       // self.calendarContainer.style.removeProperty("visibility");
+    //       // self.calendarContainer.style.removeProperty("display");
+    //     }
+    //   });
+    // }
   }
 
   /**
@@ -555,70 +548,39 @@ function FlatpickrInstance(
       incrementNumInput(e, eventTarget.classList.contains("arrowUp") ? 1 : -1);
   }
 
-  /**
-   * Increments/decrements the value of input associ-
-   * ated with the up/down arrow by dispatching an
-   * "increment" event on the input.
-   *
-   * @param {Event} e the click event
-   * @param {Number} delta the diff (usually 1 or -1)
-   * @param {Element} inputElem the input element
-   */
-  function incrementNumInput(
-    e: KeyboardEvent | MouseEvent | undefined,
-    delta: number,
-    inputElem?: HTMLInputElement
-  ) {
-    const target = e && (getEventTarget(e) as Element);
-    const input =
-      inputElem ||
-      (target && target.parentNode && target.parentNode.firstChild);
-    const event = createEvent("increment") as IncrementEvent;
-    event.delta = delta;
-    input && input.dispatchEvent(event);
-  }
-
   function build() {
     const fragment = window.document.createDocumentFragment();
-    self.calendarContainer = createElement<HTMLDivElement>(
-      "div",
-      "flatpickr-calendar"
-    );
+    let newContainer = true;
+    if (!self.calendarContainer) {
+      self.calendarContainer = createElement<HTMLDivElement>(
+        "div",
+        "flatpickr-calendar"
+      );
+    } else {
+      newContainer = false;
+      clearNode(self.calendarContainer);
+    }
     self.calendarContainer.tabIndex = -1;
 
     if (!self.config.noCalendar) {
-      fragment.appendChild(buildMonthNav());
-      self.innerContainer = createElement<HTMLDivElement>(
-        "div",
-        "flatpickr-innerContainer"
-      );
-
-      if (self.config.weekNumbers) {
-        const { weekWrapper, weekNumbers } = buildWeeks();
-        self.innerContainer.appendChild(weekWrapper);
-        self.weekNumbers = weekNumbers;
-        self.weekWrapper = weekWrapper;
-      }
-
-      self.rContainer = createElement<HTMLDivElement>(
-        "div",
-        "flatpickr-rContainer"
-      );
-      self.rContainer.appendChild(buildWeekdays());
-
-      if (!self.daysContainer) {
-        self.daysContainer = createElement<HTMLDivElement>(
-          "div",
-          "flatpickr-days"
-        );
-        self.daysContainer.tabIndex = -1;
-      }
-
-      buildDays();
-
-      self.rContainer.appendChild(self.daysContainer);
-      self.innerContainer.appendChild(self.rContainer);
-      fragment.appendChild(self.innerContainer);
+      self.calendarContainer = Calendar({
+        year: self.currentYear,
+        month: self.currentMonth,
+        config: {
+          ...self.config,
+          locale: self.l10n,
+        },
+        getCalendarMonthDates,
+        isSelected: (d: Date): boolean => !!isDateSelected(d),
+        rangePosition,
+        isEnabled,
+        events: {
+          onDayCreate: (day) => triggerEvent("onDayCreate", day),
+          onMonthChange: (delta) => {
+            self.changeMonth(delta);
+          },
+        },
+      });
     }
 
     if (self.config.enableTime) {
@@ -676,11 +638,13 @@ function FlatpickrInstance(
       }
     }
 
-    if (!self.config.static && !self.config.inline)
-      (self.config.appendTo !== undefined
-        ? self.config.appendTo
-        : window.document.body
-      ).appendChild(self.calendarContainer);
+    if (newContainer) {
+      if (!self.config.static && !self.config.inline)
+        (self.config.appendTo !== undefined
+          ? self.config.appendTo
+          : window.document.body
+        ).appendChild(self.calendarContainer);
+    }
   }
 
   function focusOnDayElem(targetNode: DayElement) {
@@ -774,7 +738,8 @@ function FlatpickrInstance(
 
   const getCalendarMonthDates = (
     year: number,
-    month: number
+    month: number,
+    l10n: Locale
   ): {
     preceedingDays: number;
     followingDays: number;
@@ -784,7 +749,7 @@ function FlatpickrInstance(
     const firstOfMonth =
       (new Date(year, month, 1).getDay() - self.l10n.firstDayOfWeek + 7) % 7;
 
-    const daysInMonth = self.utils.getDaysInMonth(month, year);
+    const daysInMonth = getDaysInMonth(month, year, l10n);
     const daysInLastWeek =
       (firstOfMonth + daysInMonth - 1 + self.l10n.firstDayOfWeek) % 7;
     const followingDays = (7 - daysInLastWeek) % 7;
@@ -808,18 +773,23 @@ function FlatpickrInstance(
       const d = new Date(self.currentYear, self.currentMonth, 1);
       d.setMonth(self.currentMonth + i);
 
-      const monthDays = MonthDays({
-        ...getCalendarMonthDates(d.getFullYear(), d.getMonth()),
+      const calendarMonth = CalendarMonth({
+        year: d.getFullYear(),
+        month: d.getMonth(),
+        getCalendarMonthDates,
         isSelected: (d: Date): boolean => !!isDateSelected(d),
         rangePosition,
         isEnabled,
-        l10n: self.l10n,
+        config: {
+          ...self.config,
+          locale: self.l10n,
+        },
         events: {
           onDayCreate: (day) => triggerEvent("onDayCreate", day),
         },
       });
 
-      frag.appendChild(monthDays);
+      frag.appendChild(calendarMonth);
     }
 
     self.daysContainer.appendChild(frag);
@@ -830,125 +800,8 @@ function FlatpickrInstance(
     }
   }
 
-  function buildMonth() {
-    const container = createElement("div", "flatpickr-month");
-    const monthNavFragment = window.document.createDocumentFragment();
-
-    let monthElement;
-
-    if (
-      self.config.showMonths > 1 ||
-      self.config.monthSelectorType === "static"
-    ) {
-      monthElement = MonthDisplay({
-        month: self.currentMonth,
-        short: self.config.shorthandCurrentMonth,
-        l10n: self.l10n,
-      });
-    } else {
-      monthElement = MonthsDropdown({
-        year: self.currentYear,
-        l10n: self.l10n,
-        minDate: self.config.minDate,
-        maxDate: self.config.maxDate,
-        short: self.config.shorthandCurrentMonth,
-        selectedMonth: self.currentMonth,
-        events: {
-          change: (value: string) => {
-            const selectedMonth = parseInt(value, 10);
-
-            self.changeMonth(selectedMonth - self.currentMonth);
-
-            triggerEvent("onMonthChange");
-          },
-        },
-      });
-    }
-
-    const [yearInput, yearElement] = YearInput({
-      l10n: self.l10n,
-      minDate: self.config.minDate,
-      maxDate: self.config.maxDate,
-      value: self.currentYear.toString(),
-    });
-
-    const currentMonth = createElement<HTMLDivElement>(
-      "div",
-      "flatpickr-current-month"
-    );
-    currentMonth.appendChild(monthElement);
-    currentMonth.appendChild(yearInput);
-
-    monthNavFragment.appendChild(currentMonth);
-    container.appendChild(monthNavFragment);
-
-    return {
-      container,
-      yearElement,
-      monthElement,
-    };
-  }
-
   function buildMonths() {
-    clearNode(self.monthNav);
-    self.monthNav.appendChild(self.prevMonthNav);
-
-    if (self.config.showMonths) {
-      self.yearElements = [];
-      self.monthElements = [];
-    }
-
-    for (let m = self.config.showMonths; m--; ) {
-      const month = buildMonth();
-      self.yearElements.push(month.yearElement);
-      self.monthElements.push(month.monthElement);
-      self.monthNav.appendChild(month.container);
-    }
-
-    self.monthNav.appendChild(self.nextMonthNav);
-  }
-
-  function buildMonthNav() {
-    self.monthNav = createElement<HTMLDivElement>("div", "flatpickr-months");
-    self.yearElements = [];
-    self.monthElements = [];
-
-    self.prevMonthNav = createElement<HTMLSpanElement>(
-      "span",
-      "flatpickr-prev-month"
-    );
-    self.prevMonthNav.innerHTML = self.config.prevArrow;
-
-    self.nextMonthNav = createElement("span", "flatpickr-next-month");
-    self.nextMonthNav.innerHTML = self.config.nextArrow;
-
-    buildMonths();
-
-    Object.defineProperty(self, "_hidePrevMonthArrow", {
-      get: () => self.__hidePrevMonthArrow,
-      set(bool: boolean) {
-        if (self.__hidePrevMonthArrow !== bool) {
-          toggleClass(self.prevMonthNav, "flatpickr-disabled", bool);
-          self.__hidePrevMonthArrow = bool;
-        }
-      },
-    });
-
-    Object.defineProperty(self, "_hideNextMonthArrow", {
-      get: () => self.__hideNextMonthArrow,
-      set(bool: boolean) {
-        if (self.__hideNextMonthArrow !== bool) {
-          toggleClass(self.nextMonthNav, "flatpickr-disabled", bool);
-          self.__hideNextMonthArrow = bool;
-        }
-      },
-    });
-
-    self.currentYearElement = self.yearElements[0];
-
-    updateNavigationCurrentMonth();
-
-    return self.monthNav;
+    console.warn("build months");
   }
 
   function buildTime() {
@@ -1062,52 +915,6 @@ function FlatpickrInstance(
     return self.timeContainer;
   }
 
-  function buildWeekdays() {
-    if (!self.weekdayContainer)
-      self.weekdayContainer = createElement<HTMLDivElement>(
-        "div",
-        "flatpickr-weekdays"
-      );
-    else clearNode(self.weekdayContainer);
-
-    for (let i = self.config.showMonths; i--; ) {
-      const container = createElement<HTMLDivElement>(
-        "div",
-        "flatpickr-weekdaycontainer"
-      );
-
-      self.weekdayContainer.appendChild(container);
-    }
-
-    updateWeekdays();
-
-    return self.weekdayContainer;
-  }
-
-  function updateWeekdays() {
-    if (!self.weekdayContainer) {
-      return;
-    }
-
-    const firstDayOfWeek = self.l10n.firstDayOfWeek;
-    let weekdays = [...self.l10n.weekdays.shorthand];
-
-    if (firstDayOfWeek > 0 && firstDayOfWeek < weekdays.length) {
-      weekdays = [
-        ...weekdays.splice(firstDayOfWeek, weekdays.length),
-        ...weekdays.splice(0, firstDayOfWeek),
-      ];
-    }
-
-    for (let i = self.config.showMonths; i--; ) {
-      self.weekdayContainer.children[i].innerHTML = `
-      <span class='flatpickr-weekday'>
-        ${weekdays.join("</span><span class='flatpickr-weekday'>")}
-      </span>
-      `;
-    }
-  }
-
   /* istanbul ignore next */
   function buildWeeks() {
     self.calendarContainer.classList.add("hasWeeks");
@@ -1150,6 +957,8 @@ function FlatpickrInstance(
 
     triggerEvent("onMonthChange");
     updateNavigationCurrentMonth();
+
+    build();
   }
 
   function clear(triggerChangeEvent = true, toInitial = true) {
@@ -2236,8 +2045,8 @@ function FlatpickrInstance(
   }
 
   const CALLBACKS: { [k in keyof Options]: Function[] } = {
-    locale: [setupLocale, updateWeekdays],
-    showMonths: [buildMonths, setCalendarWidth, buildWeekdays],
+    locale: [setupLocale],
+    showMonths: [buildMonths, setCalendarWidth],
     minDate: [jumpToDate],
     maxDate: [jumpToDate],
     positionElement: [updatePositionElement],
@@ -2565,12 +2374,6 @@ function FlatpickrInstance(
       // many front-end frameworks bind to the input event
       self.input.dispatchEvent(createEvent("input"));
     }
-  }
-
-  function createEvent(name: string): Event {
-    const e = document.createEvent("Event");
-    e.initEvent(name, true, true);
-    return e;
   }
 
   function isDateSelected(date: Date) {

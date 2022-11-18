@@ -1,3 +1,5 @@
+import { IncrementEvent } from "./index";
+
 export function toggleClass(
   elem: HTMLElement,
   className: string,
@@ -78,3 +80,31 @@ export function getEventTarget(event: Event): EventTarget | null {
     return event.target;
   }
 }
+
+export const createEvent = (name: string): Event => {
+  const e = document.createEvent("Event");
+  e.initEvent(name, true, true);
+  return e;
+};
+
+/**
+ * Increments/decrements the value of input associ-
+ * ated with the up/down arrow by dispatching an
+ * "increment" event on the input.
+ *
+ * @param {Event} e the click event
+ * @param {Number} delta the diff (usually 1 or -1)
+ * @param {Element} inputElem the input element
+ */
+export const incrementNumInput = (
+  e: KeyboardEvent | MouseEvent | undefined,
+  delta: number,
+  inputElem?: HTMLInputElement
+) => {
+  const target = e && (getEventTarget(e) as Element);
+  const input =
+    inputElem || (target && target.parentNode && target.parentNode.firstChild);
+  const event = createEvent("increment") as IncrementEvent;
+  event.delta = delta;
+  input && input.dispatchEvent(event);
+};
