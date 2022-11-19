@@ -34,6 +34,7 @@ type CalendarConfig = {
   minuteIncrement: number;
   enableSeconds: boolean;
   weekNumbers: boolean;
+  getWeek: (date: Date) => number | string;
 };
 
 type MonthDropdownOptionProps = {
@@ -463,11 +464,11 @@ const Weekdays = (props: WeekdaysProps): HTMLDivElement => {
 
 type WeekNumbersProps = {
   config: CalendarConfig;
-  firstWeek: number;
+  firstDate: Date;
   numberOfWeeks: number;
 };
 export const WeekNumbers = (props: WeekNumbersProps) => {
-  const { config, firstWeek, numberOfWeeks } = props;
+  const { config, firstDate, numberOfWeeks } = props;
   const weekWrapper = createElement<HTMLDivElement>(
     "div",
     "flatpickr-weekwrapper"
@@ -478,7 +479,11 @@ export const WeekNumbers = (props: WeekNumbersProps) => {
   let weekNumbers: string[] = [];
 
   for (let i = 0; i < numberOfWeeks; i++) {
-    weekNumbers.push(`<span class="flatpickr-day">${firstWeek + i}</span>`);
+    weekNumbers.push(
+      `<span class="flatpickr-day">${getWeek(
+        new Date(firstDate.getTime() + 7 * 24 * 60 * 60 * i * 1000)
+      )}</span>`
+    );
   }
 
   weekWrapper.innerHTML += `<div class="flatpickr-weeks">
@@ -561,11 +566,10 @@ const MonthInnerContainer = (props: MonthInnerContainerProps) => {
 
     const firstDate = new Date(year, month, -preceedingDays + 1);
     const numberOfWeeks = totalDays / 7;
-    const firstWeek = getWeek(firstDate);
 
     const weekNumbers = WeekNumbers({
       config,
-      firstWeek,
+      firstDate,
       numberOfWeeks,
     });
 

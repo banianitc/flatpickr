@@ -1,5 +1,6 @@
 import { Instance } from "./instance";
 import { CustomLocale, key as LocaleKey, Locale } from "./locale";
+import { getWeek } from "../utils/dates";
 
 export type DateOption = Date | string | number;
 export type DateRangeLimit<D = DateOption> = { from: D; to: D };
@@ -134,6 +135,9 @@ By default, Flatpickr utilizes native datetime widgets unless certain options (e
 
   /* Allows using a custom date formatting function instead of the built-in. Generally unnecessary.  */
   formatDate: (date: Date, format: string, locale: Locale) => string;
+
+  /* If "weekNumbers" are enabled, this is the function that outputs the week number for a given dates, optionally along with other text  */
+  getWeek: (date: Date) => string | number;
 
   /*   Adjusts the step for the hour input (incl. scrolling) */
   hourIncrement: number;
@@ -298,6 +302,7 @@ export interface ParsedOptions {
   enableTime: boolean;
   errorHandler: (err: Error) => void;
   formatDate?: Options["formatDate"];
+  getWeek: (date: Date) => string | number;
   hourIncrement: number;
   ignoredFocusElements: HTMLElement[];
   inline: boolean;
@@ -362,6 +367,7 @@ export const defaults: ParsedOptions = {
   enableTime: false,
   errorHandler: (err: Error) =>
     typeof console !== "undefined" && console.warn(err),
+  getWeek,
   hourIncrement: 1,
   ignoredFocusElements: [],
   inline: false,
