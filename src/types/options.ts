@@ -135,9 +135,6 @@ By default, Flatpickr utilizes native datetime widgets unless certain options (e
   /* Allows using a custom date formatting function instead of the built-in. Generally unnecessary.  */
   formatDate: (date: Date, format: string, locale: Locale) => string;
 
-  /* If "weekNumbers" are enabled, this is the function that outputs the week number for a given dates */
-  getWeek: (date: Date) => number;
-
   /*   Adjusts the step for the hour input (incl. scrolling) */
   hourIncrement: number;
 
@@ -301,7 +298,6 @@ export interface ParsedOptions {
   enableTime: boolean;
   errorHandler: (err: Error) => void;
   formatDate?: Options["formatDate"];
-  getWeek: (date: Date) => number;
   hourIncrement: number;
   ignoredFocusElements: HTMLElement[];
   inline: boolean;
@@ -366,27 +362,6 @@ export const defaults: ParsedOptions = {
   enableTime: false,
   errorHandler: (err: Error) =>
     typeof console !== "undefined" && console.warn(err),
-  getWeek: (givenDate: Date) => {
-    const date = new Date(givenDate.getTime());
-    date.setHours(0, 0, 0, 0);
-
-    // Thursday in current week decides the year.
-    date.setDate(date.getDate() + 3 - ((date.getDay() + 6) % 7));
-
-    // January 4 is always in week 1.
-    var week1 = new Date(date.getFullYear(), 0, 4);
-
-    // Adjust to Thursday in week 1 and count number of weeks from date to week1.
-    return (
-      1 +
-      Math.round(
-        ((date.getTime() - week1.getTime()) / 86400000 -
-          3 +
-          ((week1.getDay() + 6) % 7)) /
-          7
-      )
-    );
-  },
   hourIncrement: 1,
   ignoredFocusElements: [],
   inline: false,

@@ -24,7 +24,6 @@
   line-height 24px
   border-radius 5px
   position absolute
-  width $calendarWidth
   box-sizing border-box
   touch-action manipulation
 
@@ -154,6 +153,11 @@
 
   &:focus
     outline 0
+
+.flatpickr-calendar-months
+  display flex
+  flex-direction row
+  flex-wrap nowrap
 
 .flatpickr-wrapper
   position relative
@@ -459,16 +463,15 @@ span.flatpickr-weekday
   padding 0
   outline 0
   text-align left
-  width ($daysWidth)
+  // width ($daysWidth)
   min-width ($daysWidth)
-  max-width ($daysWidth)
+  // max-width ($daysWidth)
   box-sizing border-box
   display inline-block
-  display -ms-flexbox
-  display flex
-  -ms-flex-wrap wrap
-  flex-wrap wrap
-  -ms-flex-pack: justify
+  display grid
+  justify-items center
+  align-items center
+  grid-template-columns repeat(7, 1fr)
   justify-content space-around
   transform: translate3d(0px, 0px, 0px);
   opacity 1
@@ -486,8 +489,7 @@ span.flatpickr-weekday
   cursor pointer
 
   font-weight 400
-  width 14.2857143%
-  flex-basis 14.2857143%
+  width 100%
   max-width $daySize
   height $daySize
   line-height $daySize
@@ -617,17 +619,22 @@ span.flatpickr-weekday
   padding 0
   box-sizing border-box
 
+.flatpickr-time-wrapper
+  display flex
+  justify-content center
+  flex-direction row
 
 .flatpickr-time
   text-align center
   outline 0
-  display block
   height 0 // hide initially
   line-height $timeHeight
   max-height $timeHeight
+  max-width $daysWidth
   box-sizing border-box
   overflow hidden
   display flex
+  justify-content center
 
   if $noCalendarBorder is defined
     background $calendarBackground
@@ -640,21 +647,14 @@ span.flatpickr-weekday
 
   .numInputWrapper
     flex 1
-    width 40%
+    // width 40%
     height $timeHeight
-    float left
 
     span.arrowUp:after
       border-bottom-color $dayForeground
 
     span.arrowDown:after
       border-top-color $dayForeground
-
-  &.hasSeconds .numInputWrapper
-    width 26%
-
-  &.time24hr .numInputWrapper
-    width 49%
 
   input
     background transparent

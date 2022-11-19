@@ -1,7 +1,7 @@
 import { createElement, createNumberInput, getEventTarget } from "./utils/dom";
 import { monthToStr } from "./utils/formatting";
 import { Locale } from "./types/locale";
-import { getDaysInMonth, military2ampm } from "./utils/dates";
+import { getDaysInMonth, getWeek, military2ampm } from "./utils/dates";
 import { DayElement } from "./types/instance";
 import { IncrementEvent, int } from "./utils";
 
@@ -33,6 +33,7 @@ type CalendarConfig = {
   hourIncrement: number;
   minuteIncrement: number;
   enableSeconds: boolean;
+  weekNumbers: boolean;
 };
 
 type MonthDropdownOptionProps = {
@@ -145,7 +146,6 @@ export const YearInput = (props: YearInputProps): HTMLDivElement => {
   }
 
   const onInput = (e: KeyboardEvent & IncrementEvent) => {
-    console.log("event:", e);
     const eventTarget = getEventTarget(e) as HTMLInputElement;
     const newYear = parseInt(eventTarget.value) + (e.delta || 0);
 
@@ -361,6 +361,7 @@ type MonthDaysProps = {
   preceedingDays: number;
   followingDays: number;
   l10n: Locale;
+  config: CalendarConfig;
   hidePreceeding?: boolean;
   hideFollowing?: boolean;
   isSelected: (date: Date) => boolean;
@@ -379,6 +380,7 @@ export const MonthDays = (props: MonthDaysProps): HTMLDivElement => {
     hidePreceeding,
     hideFollowing,
     l10n,
+    config,
     isSelected,
     rangePosition,
     isEnabled,
@@ -459,6 +461,121 @@ const Weekdays = (props: WeekdaysProps): HTMLDivElement => {
   return weekdayContainer;
 };
 
+type WeekNumbersProps = {
+  config: CalendarConfig;
+  firstWeek: number;
+  numberOfWeeks: number;
+};
+export const WeekNumbers = (props: WeekNumbersProps) => {
+  const { config, firstWeek, numberOfWeeks } = props;
+  const weekWrapper = createElement<HTMLDivElement>(
+    "div",
+    "flatpickr-weekwrapper"
+  );
+
+  weekWrapper.innerHTML = `<span class="flatpickr-weekday">${config.locale.weekAbbreviation}</span>`;
+
+  let weekNumbers: string[] = [];
+
+  for (let i = 0; i < numberOfWeeks; i++) {
+    weekNumbers.push(`<span class="flatpickr-day">${firstWeek + i}</span>`);
+  }
+
+  weekWrapper.innerHTML += `<div class="flatpickr-weeks">
+    ${weekNumbers.join("")}
+  </div>`;
+
+  return weekWrapper;
+};
+
+type MonthInnerContainerProps = {
+  year: number;
+  month: number;
+  config: CalendarConfig;
+  isSelected: (date: Date) => boolean;
+  rangePosition: (date: Date) => RangePosition;
+  isEnabled: (date: Date, timeless: boolean) => boolean;
+  getCalendarMonthDates: (
+    year: number,
+    month: number,
+    l10n: Locale
+  ) => {
+    preceedingDays: number;
+    followingDays: number;
+    year: number;
+    month: number;
+  };
+} & EventsProp<{
+  onDayCreate?: EventHandler;
+  onDateSelect?: (d: Date) => void;
+}>;
+const MonthInnerContainer = (props: MonthInnerContainerProps) => {
+  const {
+    year,
+    month,
+    isSelected,
+    rangePosition,
+    isEnabled,
+    events,
+    config,
+    getCalendarMonthDates,
+  } = props;
+
+  const innerContainer = createElement<HTMLDivElement>(
+    "div",
+    "flatpickr-innerContainer"
+  );
+
+  const monthDaysContainer = createElement<HTMLDivElement>(
+    "div",
+    "flatpickr-rContainer"
+  );
+
+  const weekdays = Weekdays({ config });
+
+  monthDaysContainer.appendChild(weekdays);
+
+  const dates = getCalendarMonthDates(year, month, config.locale);
+
+  const monthDays = MonthDays({
+    ...dates,
+    isSelected,
+    rangePosition,
+    isEnabled,
+    l10n: config.locale,
+    config,
+    events: {
+      onDayCreate: props.events?.onDayCreate,
+      onDateSelect: events?.onDateSelect,
+    },
+  });
+
+  monthDaysContainer.appendChild(monthDays);
+
+  if (config.weekNumbers) {
+    const { preceedingDays, followingDays, year, month } = dates;
+    const totalDays =
+      preceedingDays +
+      followingDays +
+      getDaysInMonth(month, year, config.locale);
+
+    const firstDate = new Date(year, month, -preceedingDays + 1);
+    const numberOfWeeks = totalDays / 7;
+    const firstWeek = getWeek(firstDate);
+
+    const weekNumbers = WeekNumbers({
+      config,
+      firstWeek,
+      numberOfWeeks,
+    });
+
+    innerContainer.appendChild(weekNumbers);
+  }
+  innerContainer.appendChild(monthDaysContainer);
+
+  return innerContainer;
+};
+
 type CalendarMonthProps = {
   year: number;
   month: number;
@@ -526,24 +643,21 @@ export const CalendarMonth = (props: CalendarMonthProps): HTMLDivElement => {
   });
 
   monthContainer.appendChild(monthNavigation);
-
-  const weekdays = Weekdays({ config });
-
-  monthContainer.appendChild(weekdays);
-
-  const monthDays = MonthDays({
-    ...getCalendarMonthDates(year, month, config.locale),
-    isSelected,
-    rangePosition,
-    isEnabled,
-    l10n: config.locale,
-    events: {
-      onDayCreate: props.events?.onDayCreate,
-      onDateSelect: events?.onDateSelect,
-    },
-  });
-
-  monthContainer.appendChild(monthDays);
+  monthContainer.appendChild(
+    MonthInnerContainer({
+      year,
+      month,
+      config,
+      isSelected,
+      rangePosition,
+      isEnabled,
+      getCalendarMonthDates,
+      events: {
+        onDateSelect: events?.onDateSelect,
+        onDayCreate: events?.onDayCreate,
+      },
+    })
+  );
 
   return monthContainer;
 };
@@ -571,7 +685,7 @@ type CalendarProps = {
   onYearChange?: (newYear: number) => void;
   onDateSelect?: (d: Date) => void;
 }>;
-export const Calendar = (props: CalendarProps): DocumentFragment => {
+export const Calendar = (props: CalendarProps): HTMLDivElement => {
   const {
     year,
     month,
@@ -582,7 +696,10 @@ export const Calendar = (props: CalendarProps): DocumentFragment => {
     isEnabled,
   } = props;
 
-  const fragment = document.createDocumentFragment();
+  const monthsContainer = createElement<HTMLDivElement>(
+    "div",
+    "flatpickr-calendar-months"
+  );
 
   for (let i = 0; i < config.showMonths; i++) {
     const m = (month + i) % 12;
@@ -601,12 +718,12 @@ export const Calendar = (props: CalendarProps): DocumentFragment => {
       events: props.events,
     });
 
-    fragment.appendChild(singleMonth);
+    monthsContainer.appendChild(singleMonth);
   }
 
   //   fragment.appendChild(buildTime());
 
-  return fragment;
+  return monthsContainer;
 };
 type CalendarContainerProps = {
   config: CalendarConfig;
@@ -636,6 +753,10 @@ export const CalendarContainer = (
 
   if (config.enableTime) {
     classNames.push("hasTime");
+  }
+
+  if (config.weekNumbers) {
+    classNames.push("hasWeeks");
   }
 
   const container = createElement<HTMLDivElement>(
@@ -676,6 +797,12 @@ export const TimePicker = (props: TimePickerProps): HTMLDivElement => {
   if (!config.time_24hr) {
     value.hours = military2ampm(value.hours);
   }
+
+  const containerWrapper = createElement<HTMLDivElement>(
+    "div",
+    "flatpickr-time-wrapper"
+  );
+  containerWrapper.tabIndex = -1;
 
   const container = createElement<HTMLDivElement>(
     "div",
@@ -792,5 +919,7 @@ export const TimePicker = (props: TimePickerProps): HTMLDivElement => {
     container.appendChild(ampmInput);
   }
 
-  return container;
+  containerWrapper.appendChild(container);
+
+  return containerWrapper;
 };

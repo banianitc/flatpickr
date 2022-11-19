@@ -1,6 +1,7 @@
 import { int, pad } from "../utils";
 import { Locale } from "../types/locale";
 import { ParsedOptions } from "../types/options";
+import { getWeek } from "./dates";
 
 export type token =
   | "D"
@@ -200,7 +201,7 @@ export const formats: Formats = {
   U: (date: Date) => date.getTime() / 1000,
 
   W: function (date: Date, _: Locale, options: ParsedOptions) {
-    return options.getWeek(date);
+    return getWeek(date);
   },
 
   // full year e.g. 2016, padded (0001-9999)

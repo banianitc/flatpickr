@@ -34,6 +34,7 @@ import {
   parseSeconds,
   getCalendarMonthDates,
   ampm2military,
+  getDefaultDate,
 } from "./utils/dates";
 
 import { tokenRegex } from "./utils/formatting";
@@ -108,8 +109,6 @@ function FlatpickrInstance(
       updateValue(false);
     }
 
-    // setCalendarWidth();
-
     const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
 
     /* TODO: investigate this further
@@ -138,62 +137,9 @@ function FlatpickrInstance(
     return fn.bind(self);
   }
 
-  function setCalendarWidth() {
-    // const config = self.config;
-    // if (config.weekNumbers === false && config.showMonths === 1) {
-    //   return;
-    // } else if (config.noCalendar !== true) {
-    //   window.requestAnimationFrame(function () {
-    //     // if (self.calendarContainer !== undefined) {
-    //     //   self.calendarContainer.style.visibility = "hidden";
-    //     //   self.calendarContainer.style.display = "block";
-    //     // }
-    //     if (self.daysContainer !== undefined) {
-    //       const daysWidth = (self.days.offsetWidth + 1) * config.showMonths;
-    //       self.daysContainer.style.width = daysWidth + "px";
-    //       self.calendarContainer.style.width =
-    //         daysWidth +
-    //         (self.weekWrapper !== undefined
-    //           ? self.weekWrapper.offsetWidth
-    //           : 0) +
-    //         "px";
-    //       // self.calendarContainer.style.removeProperty("visibility");
-    //       // self.calendarContainer.style.removeProperty("display");
-    //     }
-    //   });
-    // }
-  }
-
-  /**
-   * Returns either `minDate` or current date and time, whichever is later
-   */
-  const getDefaultDate = (withHours?: boolean): Date => {
-    let d: Date;
-    if (
-      !self.config.minDate ||
-      compareDates(new Date(), self.config.minDate) >= 0
-    ) {
-      d = new Date();
-    } else {
-      d = new Date(self.config.minDate.getTime());
-    }
-
-    if (withHours) {
-      const defaults = getDefaultHours(self.config);
-      d.setHours(
-        defaults.hours,
-        defaults.minutes,
-        defaults.seconds,
-        d.getMilliseconds()
-      );
-    }
-
-    return d;
-  };
-
   const onTimeUpdate = (deltaSeconds: number) => {
     if (self.selectedDates.length === 0) {
-      const defaultDate = getDefaultDate(true);
+      const defaultDate = getDefaultDate(self.config, true);
 
       self.selectedDates = [defaultDate];
       self.latestSelectedDateObj = defaultDate;
@@ -454,7 +400,7 @@ function FlatpickrInstance(
 
     if (self.daysContainer !== undefined) {
       bind(self.monthNav, ["keyup", "increment"], onYearInput);
-      bind(self.daysContainer, "click", selectDate);
+      // bind(self.daysContainer, "click", selectDate);
     }
 
     if (
@@ -763,25 +709,6 @@ function FlatpickrInstance(
     if (self.config.mode === "range" && self.selectedDates.length === 1) {
       onMouseOver();
     }
-  }
-
-  /* istanbul ignore next */
-  function buildWeeks() {
-    self.calendarContainer.classList.add("hasWeeks");
-    const weekWrapper = createElement<HTMLDivElement>(
-      "div",
-      "flatpickr-weekwrapper"
-    );
-    weekWrapper.appendChild(
-      createElement("span", "flatpickr-weekday", self.l10n.weekAbbreviation)
-    );
-    const weekNumbers = createElement<HTMLDivElement>("div", "flatpickr-weeks");
-    weekWrapper.appendChild(weekNumbers);
-
-    return {
-      weekWrapper,
-      weekNumbers,
-    };
   }
 
   function clear(triggerChangeEvent = true, toInitial = true) {
@@ -1262,7 +1189,7 @@ function FlatpickrInstance(
         case self.l10n.amPM[0].charAt(0):
         case self.l10n.amPM[0].charAt(0).toLowerCase():
           self.amPM.textContent = self.l10n.amPM[0];
-          setHoursFromInputs();
+          // setHoursFromInputs();
           updateValue();
 
           break;
@@ -1270,7 +1197,7 @@ function FlatpickrInstance(
         case self.l10n.amPM[1].charAt(0):
         case self.l10n.amPM[1].charAt(0).toLowerCase():
           self.amPM.textContent = self.l10n.amPM[1];
-          setHoursFromInputs();
+          // setHoursFromInputs();
           updateValue();
 
           break;
@@ -1886,7 +1813,6 @@ function FlatpickrInstance(
 
   const CALLBACKS: { [k in keyof Options]: Function[] } = {
     locale: [setupLocale],
-    showMonths: [setCalendarWidth],
     minDate: [jumpToDate],
     maxDate: [jumpToDate],
     positionElement: [updatePositionElement],
