@@ -157,14 +157,21 @@ function FlatpickrInstance(
       self.config.maxDate &&
       compareDates(newTime, self.config.maxDate, false) >= 0
     ) {
-      console.log("to max date");
       newTime = self.config.maxDate;
     }
-    console.log("new time 2", newTime);
+
+    if (!isEnabled(newTime.getTime(), true)) {
+      return;
+    }
 
     self.latestSelectedDateObj?.setTime(newTime.getTime());
 
+    self.currentYear = self.latestSelectedDateObj?.getFullYear()!;
+    self.currentMonth = self.latestSelectedDateObj?.getMonth()!;
+
     redraw();
+    updateValue();
+    triggerChange();
   };
 
   const isPM = (amPM?: string | null): boolean => amPM === self.l10n.amPM[1];
@@ -276,48 +283,17 @@ function FlatpickrInstance(
   /**
    * Sets the hours, minutes, and optionally seconds
    * of the latest selected date object and the
-   * corresponding time inputs
    * @param {Number} hours the hour. whether its military
    *                 or am-pm gets inferred from config
    * @param {Number} minutes the minutes
    * @param {Number} seconds the seconds (optional)
    */
-  function setHours(hours: number, minutes: number, seconds: number) {
+  function setHours(hours: number, minutes: number, seconds?: number) {
     if (self.latestSelectedDateObj !== undefined) {
       self.latestSelectedDateObj.setHours(hours % 24, minutes, seconds || 0, 0);
     }
 
-    if (!self.hourElement || !self.minuteElement || self.isMobile) return;
-
-    self.hourElement.value = pad(
-      !self.config.time_24hr
-        ? ((12 + hours) % 12) + 12 * int(hours % 12 === 0)
-        : hours
-    );
-
-    self.minuteElement.value = pad(minutes);
-
-    if (self.amPM !== undefined)
-      self.amPM.textContent = self.l10n.amPM[int(hours >= 12)];
-
-    if (self.secondElement !== undefined)
-      self.secondElement.value = pad(seconds);
-  }
-
-  /**
-   * Handles the year input and incrementing events
-   * @param {Event} event the keyup or increment event
-   */
-  function onYearInput(event: KeyboardEvent & IncrementEvent) {
-    const eventTarget = getEventTarget(event) as HTMLInputElement;
-    const year = parseInt(eventTarget.value) + (event.delta || 0);
-
-    if (
-      year / 1000 > 1 ||
-      (event.key === "Enter" && !/[^\d]/.test(year.toString()))
-    ) {
-      changeYear(year);
-    }
+    redraw();
   }
 
   /**
@@ -396,11 +372,6 @@ function FlatpickrInstance(
     if (self.config.clickOpens === true) {
       bind(self._input, "focus", self.open);
       bind(self._input, "click", self.open);
-    }
-
-    if (self.daysContainer !== undefined) {
-      bind(self.monthNav, ["keyup", "increment"], onYearInput);
-      // bind(self.daysContainer, "click", selectDate);
     }
 
     if (
@@ -532,16 +503,9 @@ function FlatpickrInstance(
   };
 
   function build() {
-    // const fragment = window.document.createDocumentFragment();
     self.calendarContainer = CalendarContainer({
       config: { ...self.config, locale: self.l10n },
     });
-
-    // if (self.config.enableTime) {
-    //   fragment.appendChild(buildTime());
-    // }
-
-    //self.calendarContainer.appendChild(fragment);
 
     const customAppend =
       self.config.appendTo !== undefined &&
@@ -672,38 +636,6 @@ function FlatpickrInstance(
     if (self.daysContainer === undefined) {
       return;
     }
-
-    clearNode(self.daysContainer);
-
-    // TODO: week numbers for each month
-    if (self.weekNumbers) clearNode(self.weekNumbers);
-
-    const frag = document.createDocumentFragment();
-
-    for (let i = 0; i < self.config.showMonths; i++) {
-      const d = new Date(self.currentYear, self.currentMonth, 1);
-      d.setMonth(self.currentMonth + i);
-
-      const calendarMonth = CalendarMonth({
-        year: d.getFullYear(),
-        month: d.getMonth(),
-        getCalendarMonthDates,
-        isSelected: (d: Date): boolean => !!isDateSelected(d),
-        rangePosition,
-        isEnabled,
-        config: {
-          ...self.config,
-          locale: self.l10n,
-        },
-        events: {
-          onDayCreate: (day) => triggerEvent("onDayCreate", day),
-        },
-      });
-
-      frag.appendChild(calendarMonth);
-    }
-
-    self.daysContainer.appendChild(frag);
 
     self.days = self.daysContainer.firstChild as HTMLDivElement;
     if (self.config.mode === "range" && self.selectedDates.length === 1) {
@@ -1710,106 +1642,75 @@ function FlatpickrInstance(
     }
   }
 
-  const isSelectable = (date: Date): boolean => {};
-
-  const onDateSelect = (d: Date) => {
-    if (self.config.mode === "single") self.selectedDates = [d];
-
-    redraw();
+  const afterSelectShouldClose = () => {
+    if (!self.config.closeOnSelect) {
+      return false;
+    }
+    if (self.config.mode === "single" && !self.config.enableTime) {
+      return false;
+    }
+    return (
+      self.config.mode === "range" &&
+      self.selectedDates.length === 2 &&
+      !self.config.enableTime
+    );
   };
 
-  function selectDate(e: MouseEvent | KeyboardEvent) {
-    e.preventDefault();
-    e.stopPropagation();
-
-    const isSelectable = (day: Element) =>
-      day.classList &&
-      day.classList.contains("flatpickr-day") &&
-      !day.classList.contains("flatpickr-disabled") &&
-      !day.classList.contains("notAllowed");
-
-    const t = findParent(getEventTarget(e) as Element, isSelectable);
-
-    if (t === undefined) return;
-
-    const target = t as DayElement;
-
-    const selectedDate = (self.latestSelectedDateObj = new Date(
-      target.dateObj.getTime()
-    ));
-
-    const shouldChangeMonth =
-      (selectedDate.getMonth() < self.currentMonth ||
-        selectedDate.getMonth() >
-          self.currentMonth + self.config.showMonths - 1) &&
-      self.config.mode !== "range";
-
-    self.selectedDateElem = target;
-
-    if (self.config.mode === "single") self.selectedDates = [selectedDate];
-    else if (self.config.mode === "multiple") {
-      const selectedIndex = isDateSelected(selectedDate);
+  const dateSelects: { [k: string]: (d: Date) => void } = {
+    single: (date: Date) => {
+      self.selectedDates = [date];
+    },
+    multiple: (date: Date) => {
+      const selectedIndex = isDateSelected(date);
 
       if (selectedIndex) self.selectedDates.splice(parseInt(selectedIndex), 1);
-      else self.selectedDates.push(selectedDate);
-    } else if (self.config.mode === "range") {
+      else self.selectedDates.push(date);
+    },
+    range: (date: Date) => {
       if (self.selectedDates.length === 2) {
         self.clear(false, false);
       }
-      self.latestSelectedDateObj = selectedDate;
-      self.selectedDates.push(selectedDate);
+      self.selectedDates.push(date);
 
       // unless selecting same date twice, sort ascendingly
-      if (compareDates(selectedDate, self.selectedDates[0], true) !== 0)
+      if (compareDates(date, self.selectedDates[0], true) !== 0) {
         self.selectedDates.sort((a, b) => a.getTime() - b.getTime());
+      }
+    },
+  };
+
+  const onDateSelect = (d: Date) => {
+    if (!isEnabled(d.getTime(), !self.config.enableTime)) {
+      return;
     }
 
-    setHoursFromInputs();
+    self.latestSelectedDateObj = new Date(d.getTime());
+    const selectedDate = self.latestSelectedDateObj;
 
-    if (shouldChangeMonth) {
-      const isNewYear = self.currentYear !== selectedDate.getFullYear();
-      self.currentYear = selectedDate.getFullYear();
-      self.currentMonth = selectedDate.getMonth();
+    const isNewYear = selectedDate.getFullYear() !== self.currentYear;
+    const isNewMonth = selectedDate.getMonth() !== self.currentMonth;
 
-      if (isNewYear) {
-        triggerEvent("onYearChange");
-      }
+    const selector = dateSelects[self.config.mode];
+    if (selector) {
+      selector(selectedDate);
+    }
 
+    if (isNewYear) {
+      triggerEvent("onYearChange");
+    }
+
+    if (isNewMonth) {
       triggerEvent("onMonthChange");
     }
 
+    if (afterSelectShouldClose()) {
+      focusAndClose();
+    } else {
+      redraw();
+    }
     updateValue();
-
-    // maintain focus
-    if (
-      !shouldChangeMonth &&
-      self.config.mode !== "range" &&
-      self.config.showMonths === 1
-    )
-      focusOnDayElem(target);
-    else if (
-      self.selectedDateElem !== undefined &&
-      self.hourElement === undefined
-    ) {
-      self.selectedDateElem && self.selectedDateElem.focus();
-    }
-
-    if (self.hourElement !== undefined)
-      self.hourElement !== undefined && self.hourElement.focus();
-
-    if (self.config.closeOnSelect) {
-      const single = self.config.mode === "single" && !self.config.enableTime;
-      const range =
-        self.config.mode === "range" &&
-        self.selectedDates.length === 2 &&
-        !self.config.enableTime;
-
-      if (single || range) {
-        focusAndClose();
-      }
-    }
     triggerChange();
-  }
+  };
 
   const CALLBACKS: { [k in keyof Options]: Function[] } = {
     locale: [setupLocale],
