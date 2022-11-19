@@ -25,7 +25,7 @@ export function createElement<T extends HTMLElement>(
   return e;
 }
 
-export function clearNode(node: HTMLElement) {
+export function clearNode(node: Node) {
   while (node.firstChild) node.removeChild(node.firstChild);
 }
 
@@ -42,7 +42,12 @@ export function findParent(
 
 export function createNumberInput(
   inputClassName: string,
-  opts?: Record<string, any>
+  opts?: Record<string, any>,
+  events?: {
+    onIncrement?: () => void;
+    onDecrement?: () => void;
+    onInput?: (e: KeyboardEvent | IncrementEvent | FocusEvent) => void;
+  }
 ) {
   const wrapper = createElement<HTMLDivElement>("div", "numInputWrapper"),
     numInput = createElement<HTMLInputElement>(
@@ -61,6 +66,19 @@ export function createNumberInput(
 
   if (opts !== undefined)
     for (const key in opts) numInput.setAttribute(key, opts[key]);
+
+  if (events?.onIncrement) {
+    arrowUp.addEventListener("click", events.onIncrement);
+  }
+  if (events?.onDecrement) {
+    arrowDown.addEventListener("click", events.onDecrement);
+  }
+  if (events?.onInput) {
+    numInput.addEventListener("change", events.onInput);
+    numInput.addEventListener("blur", events.onInput);
+    numInput.addEventListener("keyup", events.onInput);
+    numInput.addEventListener("increment", events.onInput);
+  }
 
   wrapper.appendChild(numInput);
   wrapper.appendChild(arrowUp);

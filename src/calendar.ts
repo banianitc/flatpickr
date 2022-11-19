@@ -1,13 +1,9 @@
-import {
-  clearNode,
-  createElement,
-  createNumberInput,
-  getEventTarget,
-} from "./utils/dom";
+import { createElement, createNumberInput, getEventTarget } from "./utils/dom";
 import { monthToStr } from "./utils/formatting";
 import { Locale } from "./types/locale";
-import { getDaysInMonth } from "./utils/dates";
+import { getDaysInMonth, military2ampm } from "./utils/dates";
 import { DayElement } from "./types/instance";
+import { IncrementEvent, int } from "./utils";
 
 type EventHandler = (e?: any) => void;
 
@@ -28,6 +24,15 @@ type CalendarConfig = {
   shorthandCurrentMonth: boolean;
   showMonths: number;
   monthSelectorType: "dropdown" | "static";
+  mode: "single" | "multiple" | "range" | "time";
+  animate: boolean;
+  static: boolean;
+  inline: boolean;
+  enableTime: boolean;
+  time_24hr: boolean;
+  hourIncrement: number;
+  minuteIncrement: number;
+  enableSeconds: boolean;
 };
 
 type MonthDropdownOptionProps = {
@@ -119,11 +124,14 @@ export const MonthDisplay = (props: MonthDisplayProps): HTMLSpanElement => {
 
 type YearInputProps = {
   config: CalendarConfig;
-  value: string;
+  year: number;
+  events?: Events<{
+    onYearChange?: (newYear: number) => void;
+  }>;
 };
-export const YearInput = (
-  props: YearInputProps
-): [HTMLDivElement, HTMLInputElement] => {
+export const YearInput = (props: YearInputProps): HTMLDivElement => {
+  const { events, year } = props;
+
   let opts = {};
 
   if (props.config.minDate) {
@@ -136,22 +144,40 @@ export const YearInput = (
       props.config.minDate.getFullYear() === props.config.maxDate.getFullYear();
   }
 
-  const wrapper = createNumberInput("cur-year", {
-    ...opts,
-    tabindex: "-1",
-    "aria-label": props.config.locale.yearAriaLabel,
-    value: props.value,
-  });
+  const onInput = (e: KeyboardEvent & IncrementEvent) => {
+    console.log("event:", e);
+    const eventTarget = getEventTarget(e) as HTMLInputElement;
+    const newYear = parseInt(eventTarget.value) + (e.delta || 0);
 
-  const yearElement = wrapper.getElementsByTagName(
-    "input"
-  )[0] as HTMLInputElement;
+    if (
+      newYear / 1000 > 1 ||
+      (e.key === "Enter" && !/[^\d]/.test(newYear.toString()))
+    ) {
+      events?.onYearChange && events.onYearChange(newYear);
+    }
+  };
 
-  return [wrapper, yearElement];
+  const wrapper = createNumberInput(
+    "cur-year",
+    {
+      ...opts,
+      tabindex: "-1",
+      "aria-label": props.config.locale.yearAriaLabel,
+      value: year.toString(),
+    },
+    {
+      onIncrement: () => events?.onYearChange && events.onYearChange(year + 1),
+      onDecrement: () => events?.onYearChange && events.onYearChange(year - 1),
+      onInput,
+    }
+  );
+
+  return wrapper;
 };
 
 type MonthNavigationEvents = Events<{
   onMonthChange?: (delta: number) => void;
+  onYearChange?: (newYear: number) => void;
 }>;
 type MonthNavigationProps = {
   year: number;
@@ -180,17 +206,17 @@ export const MonthNavigation = (
   const onChange = props.events?.onMonthChange;
   const monthNav = createElement<HTMLDivElement>("div", "flatpickr-months");
 
-  if (!hidePrevMonthNav) {
-    const prevMonthNav = createElement<HTMLSpanElement>(
-      "span",
-      `flatpickr-prev-month ${disablePrevMonthNav ? "flatpickr-disabled" : ""}`
-    );
-    prevMonthNav.innerHTML = config.prevArrow;
-    monthNav.appendChild(prevMonthNav);
+  const prevMonthNav = createElement<HTMLSpanElement>(
+    "span",
+    `flatpickr-prev-month ${disablePrevMonthNav ? "flatpickr-disabled" : ""} ${
+      hidePrevMonthNav ? "hidden" : ""
+    }`
+  );
+  prevMonthNav.innerHTML = config.prevArrow;
+  monthNav.appendChild(prevMonthNav);
 
-    if (!disablePrevMonthNav && onChange) {
-      prevMonthNav.addEventListener("click", () => onChange(-1));
-    }
+  if (!disablePrevMonthNav && onChange) {
+    prevMonthNav.addEventListener("click", () => onChange(-1));
   }
 
   let monthElement = createElement<HTMLDivElement>("div", "flatpickr-month");
@@ -222,27 +248,30 @@ export const MonthNavigation = (
   );
   currentMonth.appendChild(monthElement);
 
-  const [yearWrapper, yearElement] = YearInput({
+  const yearWrapper = YearInput({
     config,
-    value: year.toString(),
+    year,
+    events: {
+      onYearChange: props.events?.onYearChange,
+    },
   });
 
   monthElement.appendChild(yearWrapper);
 
   monthNav.appendChild(currentMonth);
 
-  if (!hideNextMonthNav) {
-    const nextMonthNav = createElement<HTMLSpanElement>(
-      "span",
-      `flatpickr-next-month ${disableNextMonthNav ? "flatpickr-disabled" : ""}`
-    );
-    nextMonthNav.innerHTML = config.nextArrow;
+  const nextMonthNav = createElement<HTMLSpanElement>(
+    "span",
+    `flatpickr-next-month ${disableNextMonthNav ? "flatpickr-disabled" : ""} ${
+      hideNextMonthNav ? "hidden" : ""
+    }`
+  );
+  nextMonthNav.innerHTML = config.nextArrow;
 
-    monthNav.appendChild(nextMonthNav);
+  monthNav.appendChild(nextMonthNav);
 
-    if (!disableNextMonthNav && onChange) {
-      nextMonthNav.addEventListener("click", () => onChange(1));
-    }
+  if (!disableNextMonthNav && onChange) {
+    nextMonthNav.addEventListener("click", () => onChange(1));
   }
 
   return monthNav;
@@ -250,7 +279,7 @@ export const MonthNavigation = (
 
 type RangePosition = "start" | "end" | "middle" | undefined;
 
-type DayProps = EventsProp & {
+type DayProps = {
   date: Date;
   className: string;
   enabled: boolean;
@@ -258,15 +287,32 @@ type DayProps = EventsProp & {
   current?: boolean;
   hidden?: boolean;
   range?: RangePosition;
+  events?: Events<{
+    click?: (d: Date) => void;
+  }>;
 };
 export const Day = (props: DayProps): DayElement => {
-  const { date, className, enabled, selected, current, hidden, range } = props;
+  const {
+    date,
+    className,
+    enabled,
+    selected,
+    current,
+    hidden,
+    range,
+    events,
+  } = props;
+  const onClick = events?.click;
 
   const dayElement = createElement<DayElement>(
     "span",
     className,
     date.getDate().toString()
   );
+
+  if (onClick) {
+    dayElement.addEventListener("click", () => onClick(date));
+  }
 
   dayElement.dateObj = date;
   // dayElement.setAttribute(
@@ -309,7 +355,7 @@ export const Day = (props: DayProps): DayElement => {
   return dayElement;
 };
 
-type MonthDaysProps = EventsProp & {
+type MonthDaysProps = {
   year: number;
   month: number;
   preceedingDays: number;
@@ -320,6 +366,9 @@ type MonthDaysProps = EventsProp & {
   isSelected: (date: Date) => boolean;
   rangePosition: (date: Date) => RangePosition;
   isEnabled: (date: Date, timeless: boolean) => boolean;
+  events?: Events<{
+    onDateSelect?: (d: Date) => void;
+  }>;
 };
 export const MonthDays = (props: MonthDaysProps): HTMLDivElement => {
   const {
@@ -357,6 +406,9 @@ export const MonthDays = (props: MonthDaysProps): HTMLDivElement => {
       enabled: isEnabled(date, true),
       selected,
       range,
+      events: {
+        click: props.events?.onDateSelect,
+      },
     });
 
     if (props?.events?.onDayCreate) {
@@ -410,6 +462,8 @@ const Weekdays = (props: WeekdaysProps): HTMLDivElement => {
 type CalendarMonthProps = {
   year: number;
   month: number;
+  hidePrevMonthNav?: boolean;
+  hideNextMonthNav?: boolean;
   config: CalendarConfig;
   isSelected: (date: Date) => boolean;
   rangePosition: (date: Date) => RangePosition;
@@ -427,11 +481,15 @@ type CalendarMonthProps = {
 } & EventsProp<{
   onDayCreate?: EventHandler;
   onMonthChange?: (delta: number) => void;
+  onYearChange?: (newYear: number) => void;
+  onDateSelect?: (d: Date) => void;
 }>;
 export const CalendarMonth = (props: CalendarMonthProps): HTMLDivElement => {
   const {
     year,
     month,
+    hidePrevMonthNav,
+    hideNextMonthNav,
     config,
     isSelected,
     rangePosition,
@@ -445,17 +503,11 @@ export const CalendarMonth = (props: CalendarMonthProps): HTMLDivElement => {
     "flatpickr-calendar-month"
   );
 
-  console.log(
-    "min date check:",
-    config,
-    config.minDate &&
-      year === config.minDate.getFullYear() &&
-      config.minDate.getMonth() === month
-  );
-
   const monthNavigation = MonthNavigation({
     year,
     month,
+    hidePrevMonthNav,
+    hideNextMonthNav,
     config,
     disablePrevMonthNav:
       config.minDate &&
@@ -469,6 +521,7 @@ export const CalendarMonth = (props: CalendarMonthProps): HTMLDivElement => {
       config.showMonths == 1 && config.monthSelectorType == "dropdown",
     events: {
       onMonthChange: events?.onMonthChange,
+      onYearChange: events?.onYearChange,
     },
   });
 
@@ -486,6 +539,7 @@ export const CalendarMonth = (props: CalendarMonthProps): HTMLDivElement => {
     l10n: config.locale,
     events: {
       onDayCreate: props.events?.onDayCreate,
+      onDateSelect: events?.onDateSelect,
     },
   });
 
@@ -514,8 +568,10 @@ type CalendarProps = {
 } & EventsProp<{
   onDayCreate?: EventHandler;
   onMonthChange?: (delta: number) => void;
+  onYearChange?: (newYear: number) => void;
+  onDateSelect?: (d: Date) => void;
 }>;
-export const Calendar = (props: CalendarProps): HTMLDivElement => {
+export const Calendar = (props: CalendarProps): DocumentFragment => {
   const {
     year,
     month,
@@ -525,7 +581,8 @@ export const Calendar = (props: CalendarProps): HTMLDivElement => {
     rangePosition,
     isEnabled,
   } = props;
-  const container = createElement<HTMLDivElement>("div", "flatpickr-calendar");
+
+  const fragment = document.createDocumentFragment();
 
   for (let i = 0; i < config.showMonths; i++) {
     const m = (month + i) % 12;
@@ -539,10 +596,200 @@ export const Calendar = (props: CalendarProps): HTMLDivElement => {
       isSelected,
       rangePosition,
       isEnabled,
+      hidePrevMonthNav: i != 0,
+      hideNextMonthNav: i != config.showMonths - 1,
       events: props.events,
     });
 
-    container.appendChild(singleMonth);
+    fragment.appendChild(singleMonth);
+  }
+
+  //   fragment.appendChild(buildTime());
+
+  return fragment;
+};
+type CalendarContainerProps = {
+  config: CalendarConfig;
+};
+export const CalendarContainer = (
+  props: CalendarContainerProps
+): HTMLDivElement => {
+  const { config } = props;
+  const classNames: string[] = [];
+  if (config.mode === "range") {
+    classNames.push("rangeMode");
+  }
+
+  if (config.showMonths > 1) {
+    classNames.push("multiMonth");
+  }
+
+  if (config.animate) {
+    classNames.push("animate");
+  }
+
+  if (config.inline) {
+    classNames.push("inline");
+  } else if (config.static) {
+    classNames.push("static");
+  }
+
+  if (config.enableTime) {
+    classNames.push("hasTime");
+  }
+
+  const container = createElement<HTMLDivElement>(
+    "div",
+    `flatpickr-calendar ${classNames.join(" ")}`
+  );
+
+  return container;
+};
+
+type TimePickerProps = {
+  config: CalendarConfig;
+  value?: {
+    hours?: number;
+    minutes?: number;
+    seconds?: number;
+  };
+  events?: Events<{
+    onTimeUpdate?: (deltaSeconds: number) => void;
+  }>;
+};
+export const TimePicker = (props: TimePickerProps): HTMLDivElement => {
+  const { config, events } = props;
+  const value = {
+    hours: props.value?.hours || 0,
+    minutes: props.value?.minutes || 0,
+    seconds: props.value?.seconds || 0,
+  };
+  const onUpdate = events?.onTimeUpdate || (() => {});
+  const halfDay = 12 * 60 * 60;
+  const multipliers = {
+    hours: 60 * 60,
+    minutes: 60,
+    seconds: 1,
+  };
+
+  const isPM = value.hours > 11;
+  if (!config.time_24hr) {
+    value.hours = military2ampm(value.hours);
+  }
+
+  const container = createElement<HTMLDivElement>(
+    "div",
+    `flatpickr-time ${config.time_24hr ? "time24hr" : ""}`
+  );
+  container.tabIndex = -1;
+
+  const separator = createElement("span", "flatpickr-time-separator", ":");
+
+  const onInput = (type: "hours" | "minutes" | "seconds") => {
+    const multiplier = multipliers[type];
+    return (e: KeyboardEvent | IncrementEvent | FocusEvent) => {
+      const eventTarget = getEventTarget(e) as HTMLInputElement;
+      const newValue = parseInt(eventTarget.value) + (e.delta || 0);
+
+      if (
+        e.type === "blur" ||
+        (e.key === "Enter" && !/[^\d]/.test(newValue.toString()))
+      ) {
+        events?.onTimeUpdate &&
+          events.onTimeUpdate((newValue - value[type]) * multiplier);
+      }
+    };
+  };
+  const onIncrement = (type: "hours" | "minutes" | "seconds") => {
+    return () => {
+      events?.onTimeUpdate && events.onTimeUpdate(multipliers[type]);
+    };
+  };
+  const onDecrement = (type: "hours" | "minutes" | "seconds") => {
+    return () => {
+      events?.onTimeUpdate && events.onTimeUpdate(-multipliers[type]);
+    };
+  };
+
+  const hourInput = createNumberInput(
+    "flatpickr-hour",
+    {
+      "aria-label": config.locale.hourAriaLabel,
+      value: value.hours,
+      min: config.time_24hr ? 0 : 1,
+      max: config.time_24hr ? 23 : 12,
+      step: config.hourIncrement,
+      maxlength: 2,
+    },
+    {
+      onInput: onInput("hours"),
+      onIncrement: onIncrement("hours"),
+      onDecrement: onDecrement("hours"),
+    }
+  );
+
+  const minuteInput = createNumberInput(
+    "flatpickr-minute",
+    {
+      "aria-label": config.locale.minuteAriaLabel,
+      value: value.minutes,
+      min: 0,
+      max: 59,
+      step: config.minuteIncrement,
+      maxlength: 2,
+    },
+    {
+      onInput: onInput("minutes"),
+      onIncrement: onIncrement("minutes"),
+      onDecrement: onDecrement("minutes"),
+    }
+  );
+
+  container.appendChild(hourInput);
+  container.appendChild(separator);
+  container.appendChild(minuteInput);
+
+  let secondInput: HTMLDivElement;
+  if (config.enableSeconds) {
+    container.classList.add("hasSeconds");
+
+    secondInput = createNumberInput(
+      "flatpickr-second",
+      {
+        "aria-label": config.locale.minuteAriaLabel,
+        value: value.seconds,
+        min: 0,
+        max: 59,
+        step: config.minuteIncrement,
+        maxlength: 2,
+      },
+      {
+        onInput: onInput("seconds"),
+        onIncrement: onIncrement("seconds"),
+        onDecrement: onDecrement("seconds"),
+      }
+    );
+
+    container.appendChild(
+      createElement("span", "flatpickr-time-separator", ":")
+    );
+    container.appendChild(secondInput);
+  }
+
+  if (!config.time_24hr) {
+    const ampmInput = createElement<HTMLButtonElement>(
+      "button",
+      "flatpickr-am-pm",
+      config.locale.amPM[int(isPM)]
+    );
+    ampmInput.title = config.locale.toggleTitle;
+    ampmInput.tabIndex = -1;
+
+    ampmInput.addEventListener("click", () =>
+      onUpdate(isPM ? -halfDay : halfDay)
+    );
+
+    container.appendChild(ampmInput);
   }
 
   return container;

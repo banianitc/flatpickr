@@ -8,6 +8,7 @@ import {
 } from "./formatting";
 import { defaults, ParsedOptions } from "../types/options";
 import { english } from "../l10n/default";
+import { int } from "./index";
 
 export interface FormatterArgs {
   config?: ParsedOptions;
@@ -172,6 +173,21 @@ export const duration = {
   DAY: 86400000,
 };
 
+export const ampm2military = (hour: number, isPM: boolean): number => {
+  return (hour % 12) + 12 * int(isPM);
+};
+
+export const military2ampm = (hour: number): number => {
+  switch (hour % 24) {
+    case 0:
+    case 12:
+      return 12;
+
+    default:
+      return hour % 12;
+  }
+};
+
 export function getDefaultHours(config: ParsedOptions) {
   let hours = config.defaultHour;
   let minutes = config.defaultMinute;
@@ -212,4 +228,25 @@ export const getDaysInMonth = (month: number, year: number, l10n: Locale) => {
     return 29;
 
   return l10n.daysInMonth[month];
+};
+
+export const getCalendarMonthDates = (
+  year: number,
+  month: number,
+  l10n: Locale
+): {
+  preceedingDays: number;
+  followingDays: number;
+  year: number;
+  month: number;
+} => {
+  const firstOfMonth =
+    (new Date(year, month, 1).getDay() - l10n.firstDayOfWeek + 7) % 7;
+
+  const daysInMonth = getDaysInMonth(month, year, l10n);
+  const daysInLastWeek =
+    (firstOfMonth + daysInMonth - 1 + l10n.firstDayOfWeek) % 7;
+  const followingDays = (7 - daysInLastWeek) % 7;
+
+  return { preceedingDays: firstOfMonth, followingDays, year, month };
 };
