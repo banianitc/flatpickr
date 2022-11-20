@@ -1,0 +1,11 @@
+span.flatpickr-weekday {
+  display: inline-block;
+}
+span.flatpickr-day {
+  margin: 0 2.491071428571428px;
+}
+@media screen and (min-width: 0\0) {
+  div.flatpickr-current-month {
+    padding-top: 0px !important;
+  }
+}
