@@ -46,7 +46,7 @@ export function createNumberInput(
   events?: {
     onIncrement?: () => void;
     onDecrement?: () => void;
-    onInput?: (e: KeyboardEvent | IncrementEvent | FocusEvent) => void;
+    onInput?: (e: KeyboardEvent | IncrementEvent | FocusEvent | Event) => void;
   }
 ) {
   const wrapper = createElement<HTMLDivElement>("div", "numInputWrapper"),
@@ -77,7 +77,7 @@ export function createNumberInput(
     numInput.addEventListener("change", events.onInput);
     numInput.addEventListener("blur", events.onInput);
     numInput.addEventListener("keyup", events.onInput);
-    numInput.addEventListener("increment", events.onInput);
+    // numInput.addEventListener("increment", events.onInput);
   }
 
   wrapper.appendChild(numInput);

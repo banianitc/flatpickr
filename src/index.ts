@@ -11,14 +11,13 @@ import {
   HOOKS,
 } from "./types/options";
 
-import { Locale, CustomLocale, key as LocaleKey } from "./types/locale";
+import { CustomLocale, key as LocaleKey, Locale } from './types/locale';
 import English from "./l10n/default";
 
-import { arrayify, debounce, int, pad, IncrementEvent } from "./utils";
+import { arrayify, debounce } from "./utils";
 import {
   clearNode,
   createElement,
-  findParent,
   toggleClass,
   getEventTarget,
   createEvent,
@@ -30,10 +29,7 @@ import {
   duration,
   isBetween,
   getDefaultHours,
-  calculateSecondsSinceMidnight,
-  parseSeconds,
   getCalendarMonthDates,
-  ampm2military,
   getDefaultDate,
 } from "./utils/dates";
 
@@ -43,10 +39,8 @@ import "./utils/polyfills";
 import {
   Calendar,
   CalendarContainer,
-  CalendarMonth,
   TimePicker,
 } from "./calendar";
-import { Croatian } from "./l10n/hr";
 
 const DEBOUNCED_CHANGE_MS = 300;
 
@@ -146,7 +140,7 @@ function FlatpickrInstance(
     }
 
     let newTime = new Date(
-      self.latestSelectedDateObj?.getTime() + deltaSeconds * 1000
+      self.latestSelectedDateObj!.getTime() + deltaSeconds * 1000
     );
     if (
       self.config.minDate &&
@@ -173,8 +167,6 @@ function FlatpickrInstance(
     updateValue();
     triggerChange();
   };
-
-  const isPM = (amPM?: string | null): boolean => amPM === self.l10n.amPM[1];
 
   /**
    * Syncs time input values with a date
@@ -366,7 +358,6 @@ function FlatpickrInstance(
   };
 
   const draw = () => {
-    console.log("drawing", self.latestSelectedDateObj);
     clearNode(self.calendarContainer);
 
     if (!self.config.noCalendar) {
@@ -539,16 +530,16 @@ function FlatpickrInstance(
     }
   }
 
-  function buildDays() {
-    if (self.daysContainer === undefined) {
-      return;
-    }
+  // function buildDays() {
+  //   if (self.daysContainer === undefined) {
+  //     return;
+  //   }
 
-    self.days = self.daysContainer.firstChild as HTMLDivElement;
-    if (self.config.mode === "range" && self.selectedDates.length === 1) {
-      onMouseOver();
-    }
-  }
+  //   self.days = self.daysContainer.firstChild as HTMLDivElement;
+  //   if (self.config.mode === "range" && self.selectedDates.length === 1) {
+  //     onMouseOver();
+  //   }
+  // }
 
   function clear(triggerChangeEvent = true, toInitial = true) {
     self.input.value = "";
@@ -856,7 +847,7 @@ function FlatpickrInstance(
 
   function onBlur(e: FocusEvent) {
     const isInput = e.target === self._input;
-    const valueChanged = self._input.value.trimEnd() !== getDateStr();
+    const valueChanged = self._input.value.trimEnd() !== getDateStr({});
 
     if (
       isInput &&
@@ -922,7 +913,7 @@ function FlatpickrInstance(
             e.preventDefault();
             // updateTime();
             focusAndClose();
-          } else selectDate(e);
+          } // else selectDate(e);
 
           break;
 
@@ -1412,6 +1403,7 @@ function FlatpickrInstance(
     }
 
     self.formatDate = createDateFormatter(self);
+    self.formatAltDate = createDateFormatter(self, "altValue");
     self.parseDate = createDateParser({ config: self.config, l10n: self.l10n });
   }
 
@@ -1985,13 +1977,29 @@ function FlatpickrInstance(
     return "middle";
   }
 
-  function getDateStr(specificFormat?: string) {
+  function getDateStr(opts: {
+    specificFormat?: string;
+    type?: "value" | "altValue";
+  }) {
+    const { specificFormat } = opts;
+    const type = opts.type || "value";
+
     const format =
       specificFormat ||
       (self.config.altInput ? self.config.altFormat : self.config.dateFormat);
 
+    let formatter: (d: Date, f: string) => string;
+    switch (type) {
+      case "value":
+        formatter = self.formatDate;
+        break;
+      case "altValue":
+        formatter = self.formatAltDate;
+        break;
+    }
+
     return self.selectedDates
-      .map((dObj) => self.formatDate(dObj, format))
+      .map((dObj) => formatter(dObj, format))
       .filter(
         (d, i, arr) =>
           self.config.mode !== "range" ||
@@ -2016,10 +2024,16 @@ function FlatpickrInstance(
           : "";
     }
 
-    self.input.value = getDateStr(self.config.dateFormat);
+    self.input.value = getDateStr({
+      specificFormat: self.config.dateFormat,
+      type: "value",
+    });
 
     if (self.altInput !== undefined) {
-      self.altInput.value = getDateStr(self.config.altFormat);
+      self.altInput.value = getDateStr({
+        specificFormat: self.config.altFormat,
+        type: "altValue",
+      });
     }
 
     if (triggerChange !== false) triggerEvent("onValueUpdate");

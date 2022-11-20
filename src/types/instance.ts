@@ -117,6 +117,7 @@ export type Instance = Elements &
       timeless?: boolean
     ) => Date | undefined;
     formatDate: (dateObj: Date, frmt: string) => string;
+    formatAltDate: (dateObj: Date, format: string) => string;
 
     // Internals
 

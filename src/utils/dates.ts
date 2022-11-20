@@ -16,19 +16,20 @@ export interface FormatterArgs {
   isMobile?: boolean;
 }
 
-export const createDateFormatter = ({
-  config = defaults,
-  l10n = english,
-  isMobile = false,
-}: FormatterArgs) => (
-  dateObj: Date,
-  frmt: string,
-  overrideLocale?: Locale
-): string => {
+export const createDateFormatter = (
+  { config = defaults, l10n = english, isMobile = false }: FormatterArgs,
+  type: "value" | "altValue" = "value"
+) => (dateObj: Date, frmt: string, overrideLocale?: Locale): string => {
   const locale = overrideLocale || l10n;
 
-  if (config.formatDate !== undefined && !isMobile) {
-    return config.formatDate(dateObj, frmt, locale);
+  if (!isMobile) {
+    if (config.formatDate !== undefined && type == "value") {
+      return config.formatDate(dateObj, frmt, locale);
+    }
+
+    if (config.formatAltDate !== undefined && type == "altValue") {
+      return config.formatAltDate(dateObj, frmt, locale);
+    }
   }
 
   return frmt

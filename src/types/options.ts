@@ -133,8 +133,11 @@ By default, Flatpickr utilizes native datetime widgets unless certain options (e
 
   errorHandler: (e: Error) => void;
 
-  /* Allows using a custom date formatting function instead of the built-in. Generally unnecessary.  */
+  /* Allows using a custom date formatting function instead of the built-in for value. Generally unnecessary.  */
   formatDate: (date: Date, format: string, locale: Locale) => string;
+
+  /* Allows using a custom date formatting function instead of the built-in for alt value. Generally unnecessary.  */
+  formatAltDate: (dateObj: Date, format: string, locale: Locale) => string;
 
   /* If "weekNumbers" are enabled, this is the function that outputs the week number for a given dates, optionally along with other text  */
   getWeek: (date: Date) => string | number;
@@ -302,6 +305,7 @@ export interface ParsedOptions {
   enableTime: boolean;
   errorHandler: (err: Error) => void;
   formatDate?: Options["formatDate"];
+  formatAltDate?: Options["formatAltDate"];
   getWeek: (date: Date) => string | number;
   hourIncrement: number;
   ignoredFocusElements: HTMLElement[];

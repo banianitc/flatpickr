@@ -134,7 +134,7 @@ type YearInputProps = {
 export const YearInput = (props: YearInputProps): HTMLDivElement => {
   const { events, year } = props;
 
-  let opts = {};
+  let opts: {[k: string]: unknown} = {};
 
   if (props.config.minDate) {
     opts["min"] = props.config.minDate.getFullYear().toString();
@@ -146,13 +146,13 @@ export const YearInput = (props: YearInputProps): HTMLDivElement => {
       props.config.minDate.getFullYear() === props.config.maxDate.getFullYear();
   }
 
-  const onInput = (e: KeyboardEvent & IncrementEvent) => {
+  const onInput = (e: KeyboardEvent | IncrementEvent | Event) => {
     const eventTarget = getEventTarget(e) as HTMLInputElement;
-    const newYear = parseInt(eventTarget.value) + (e.delta || 0);
+    const newYear = parseInt(eventTarget.value) + ((e as IncrementEvent).delta || 0);
 
     if (
       newYear / 1000 > 1 ||
-      (e.key === "Enter" && !/[^\d]/.test(newYear.toString()))
+      ((e as KeyboardEvent).key === "Enter" && !/[^\d]/.test(newYear.toString()))
     ) {
       events?.onYearChange && events.onYearChange(newYear);
     }
@@ -381,7 +381,6 @@ export const MonthDays = (props: MonthDaysProps): HTMLDivElement => {
     hidePreceeding,
     hideFollowing,
     l10n,
-    config,
     isSelected,
     rangePosition,
     isEnabled,
@@ -818,13 +817,13 @@ export const TimePicker = (props: TimePickerProps): HTMLDivElement => {
 
   const onInput = (type: "hours" | "minutes" | "seconds") => {
     const multiplier = multipliers[type];
-    return (e: KeyboardEvent | IncrementEvent | FocusEvent) => {
+    return (e: KeyboardEvent | IncrementEvent | FocusEvent | Event) => {
       const eventTarget = getEventTarget(e) as HTMLInputElement;
-      const newValue = parseInt(eventTarget.value) + (e.delta || 0);
+      const newValue = parseInt(eventTarget.value) + ((e as IncrementEvent).delta || 0);
 
       if (
         e.type === "blur" ||
-        (e.key === "Enter" && !/[^\d]/.test(newValue.toString()))
+        ((e as KeyboardEvent).key === "Enter" && !/[^\d]/.test(newValue.toString()))
       ) {
         events?.onTimeUpdate &&
           events.onTimeUpdate((newValue - value[type]) * multiplier);
