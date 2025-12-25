@@ -781,7 +781,7 @@ type TimePickerProps = {
     onTimeUpdate?: (deltaSeconds: number) => void;
   }>;
 };
-export const TimePicker = (props: TimePickerProps): HTMLDivElement => {
+export const TimePicker = (props: TimePickerProps): DocumentFragment => {
   const { config, events } = props;
   const value = {
     hours: props.value?.hours || 0,
@@ -801,11 +801,7 @@ export const TimePicker = (props: TimePickerProps): HTMLDivElement => {
     value.hours = military2ampm(value.hours);
   }
 
-  const containerWrapper = createElement<HTMLDivElement>(
-    "div",
-    "flatpickr-time-wrapper"
-  );
-  containerWrapper.tabIndex = -1;
+  const containerWrapper = document.createDocumentFragment();
 
   const container = createElement<HTMLDivElement>(
     "div",
