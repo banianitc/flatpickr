@@ -11,7 +11,7 @@ import {
   HOOKS,
 } from "./types/options";
 
-import { CustomLocale, key as LocaleKey, Locale } from './types/locale';
+import { CustomLocale, key as LocaleKey, Locale } from "./types/locale";
 import English from "./l10n/default";
 
 import { arrayify, debounce } from "./utils";
@@ -36,11 +36,7 @@ import {
 import { tokenRegex } from "./utils/formatting";
 
 import "./utils/polyfills";
-import {
-  Calendar,
-  CalendarContainer,
-  TimePicker,
-} from "./calendar";
+import { Calendar, CalendarContainer, TimePicker } from "./calendar";
 
 const DEBOUNCED_CHANGE_MS = 300;
 

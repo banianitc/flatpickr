@@ -134,7 +134,7 @@ type YearInputProps = {
 export const YearInput = (props: YearInputProps): HTMLDivElement => {
   const { events, year } = props;
 
-  let opts: {[k: string]: unknown} = {};
+  let opts: { [k: string]: unknown } = {};
 
   if (props.config.minDate) {
     opts["min"] = props.config.minDate.getFullYear().toString();
@@ -148,11 +148,13 @@ export const YearInput = (props: YearInputProps): HTMLDivElement => {
 
   const onInput = (e: KeyboardEvent | IncrementEvent | Event) => {
     const eventTarget = getEventTarget(e) as HTMLInputElement;
-    const newYear = parseInt(eventTarget.value) + ((e as IncrementEvent).delta || 0);
+    const newYear =
+      parseInt(eventTarget.value) + ((e as IncrementEvent).delta || 0);
 
     if (
       newYear / 1000 > 1 ||
-      ((e as KeyboardEvent).key === "Enter" && !/[^\d]/.test(newYear.toString()))
+      ((e as KeyboardEvent).key === "Enter" &&
+        !/[^\d]/.test(newYear.toString()))
     ) {
       events?.onYearChange && events.onYearChange(newYear);
     }
@@ -395,6 +397,12 @@ export const MonthDays = (props: MonthDaysProps): HTMLDivElement => {
     const selected = isSelected(date);
     const range = rangePosition(date);
 
+    const currentDate = new Date();
+    const current =
+      date.getDate() === currentDate.getDate() &&
+      date.getMonth() === currentDate.getMonth() &&
+      date.getFullYear() === currentDate.getFullYear();
+
     let classNames = "";
     if (i < preceedingDays) {
       classNames = `prevMonthDay ${hidePreceeding && "hidden"}`;
@@ -404,6 +412,7 @@ export const MonthDays = (props: MonthDaysProps): HTMLDivElement => {
 
     const day = Day({
       date,
+      current,
       className: `flatpickr-day ${classNames}`,
       enabled: isEnabled(date, true),
       selected,
@@ -815,11 +824,13 @@ export const TimePicker = (props: TimePickerProps): DocumentFragment => {
     const multiplier = multipliers[type];
     return (e: KeyboardEvent | IncrementEvent | FocusEvent | Event) => {
       const eventTarget = getEventTarget(e) as HTMLInputElement;
-      const newValue = parseInt(eventTarget.value) + ((e as IncrementEvent).delta || 0);
+      const newValue =
+        parseInt(eventTarget.value) + ((e as IncrementEvent).delta || 0);
 
       if (
         e.type === "blur" ||
-        ((e as KeyboardEvent).key === "Enter" && !/[^\d]/.test(newValue.toString()))
+        ((e as KeyboardEvent).key === "Enter" &&
+          !/[^\d]/.test(newValue.toString()))
       ) {
         events?.onTimeUpdate &&
           events.onTimeUpdate((newValue - value[type]) * multiplier);
