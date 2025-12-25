@@ -1579,7 +1579,23 @@ function FlatpickrInstance(
       return;
     }
 
+    const lastPreviousDate: Date = self.latestSelectedDateObj ?? new Date();
+    if (!self.latestSelectedDateObj) {
+      lastPreviousDate.setHours(
+        self.config.defaultHour ?? 0,
+        self.config.defaultMinute ?? 0,
+        0,
+        0
+      );
+    }
+
     self.latestSelectedDateObj = new Date(d.getTime());
+    if (self.config.enableTime) {
+      self.latestSelectedDateObj.setHours(
+        lastPreviousDate.getHours(),
+        lastPreviousDate.getMinutes()
+      );
+    }
     const selectedDate = self.latestSelectedDateObj;
 
     const isNewYear = selectedDate.getFullYear() !== self.currentYear;
